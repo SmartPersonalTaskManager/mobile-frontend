@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:sptm/core/constants.dart';
+import 'package:sptm/models/mission.dart';
 import 'package:sptm/models/task_item.dart';
+import 'package:sptm/services/mission_service.dart';
 import 'package:sptm/services/task_service.dart';
 import 'package:sptm/views/dashboard/widgets/task_card.dart';
 import 'package:sptm/views/notifications/notifications_page.dart';
@@ -41,19 +43,14 @@ class _DashboardPageState extends State<DashboardPage>
     "not_urgent_not_important": null,
   };
   final List<TaskItem> _tasks = [];
-  final List<String> _quickCaptureMissions = const [
-    "Health",
-    "Career",
-    "Learning",
-    "Relationships",
-    "Finance",
-  ];
+  final List<String> _subMissionTitles = [];
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     _loadTasks();
+    _loadSubMissions();
     _listeningPulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -84,6 +81,7 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   final TaskService _taskService = TaskService();
+  final MissionService _missionService = MissionService();
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
@@ -119,6 +117,54 @@ class _DashboardPageState extends State<DashboardPage>
         context,
       ).showSnackBar(SnackBar(content: Text("Failed to load tasks: $e")));
     }
+  }
+
+  Future<void> _loadSubMissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) return;
+
+    try {
+      final missions = await _missionService.fetchUserMissions(userId);
+      if (!mounted) return;
+      final titles = <String>{};
+      for (final Mission mission in missions) {
+        for (final SubMission subMission in mission.subMissions) {
+          final title = subMission.title.trim();
+          if (title.isNotEmpty) {
+            titles.add(title);
+          }
+        }
+      }
+      setState(() {
+        _subMissionTitles
+          ..clear()
+          ..addAll(titles.toList()..sort());
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to load sub-missions: $e")),
+      );
+    }
+  }
+
+  bool get _hasSubMissions => _subMissionTitles.isNotEmpty;
+
+  List<DropdownMenuItem<String>> _buildSubMissionItems() {
+    if (_subMissionTitles.isEmpty) {
+      return const [
+        DropdownMenuItem<String>(
+          value: "__none__",
+          child: Text("No sub-missions available"),
+        ),
+      ];
+    }
+    return _subMissionTitles
+        .map(
+          (title) => DropdownMenuItem<String>(value: title, child: Text(title)),
+        )
+        .toList();
   }
 
   Future<void> _toggleTaskDone(TaskItem task) async {
@@ -207,6 +253,7 @@ class _DashboardPageState extends State<DashboardPage>
 
   Future<void> _openQuickCaptureSheet() async {
     _quickTaskController.clear();
+    await _loadSubMissions();
     String? selectedMission;
     _isQuickCaptureOpen = true;
     await showModalBottomSheet<void>(
@@ -321,26 +368,23 @@ class _DashboardPageState extends State<DashboardPage>
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: selectedMission,
-                    hint: const Text(
-                      "Optional mission",
-                      style: TextStyle(color: Color(AppColors.textMuted)),
+                    hint: Text(
+                      _hasSubMissions
+                          ? "Optional sub-mission"
+                          : "No sub-missions available",
+                      style: const TextStyle(color: Color(AppColors.textMuted)),
                     ),
                     dropdownColor: const Color(AppColors.surface),
                     iconEnabledColor: const Color(AppColors.textMuted),
                     style: const TextStyle(color: Color(AppColors.textMain)),
-                    items: _quickCaptureMissions
-                        .map(
-                          (mission) => DropdownMenuItem(
-                            value: mission,
-                            child: Text(mission),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setModalState(() {
-                        selectedMission = value;
-                      });
-                    },
+                    items: _buildSubMissionItems(),
+                    onChanged: _hasSubMissions
+                        ? (value) {
+                            setModalState(() {
+                              selectedMission = value;
+                            });
+                          }
+                        : null,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(AppColors.surfaceBase),
@@ -419,9 +463,10 @@ class _DashboardPageState extends State<DashboardPage>
     try {
       final newTask = await _taskService.createTask(
         title: title,
-        mission: mission,
         userId: userId,
+        mission: mission,
       );
+      if (!mounted) return;
       setState(() {
         _tasks.insert(0, newTask);
       });
@@ -501,6 +546,7 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Future<void> _openAddTaskSheet() async {
+    await _loadSubMissions();
     final titleController = TextEditingController();
     final dueDateController = TextEditingController();
     bool? urgent;
@@ -696,29 +742,28 @@ class _DashboardPageState extends State<DashboardPage>
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         value: selectedMission,
-                        hint: const Text(
-                          "Linked sub-mission",
-                          style: TextStyle(color: Color(AppColors.textMuted)),
+                        hint: Text(
+                          _hasSubMissions
+                              ? "Linked sub-mission"
+                              : "No sub-missions available",
+                          style: const TextStyle(
+                            color: Color(AppColors.textMuted),
+                          ),
                         ),
                         dropdownColor: const Color(AppColors.surface),
                         iconEnabledColor: const Color(AppColors.textMuted),
                         style: const TextStyle(
                           color: Color(AppColors.textMain),
                         ),
-                        items: _quickCaptureMissions
-                            .map(
-                              (mission) => DropdownMenuItem(
-                                value: mission,
-                                child: Text(mission),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setModalState(() {
-                            selectedMission = value;
-                            errorText = null;
-                          });
-                        },
+                        items: _buildSubMissionItems(),
+                        onChanged: _hasSubMissions
+                            ? (value) {
+                                setModalState(() {
+                                  selectedMission = value;
+                                  errorText = null;
+                                });
+                              }
+                            : null,
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: const Color(AppColors.surfaceBase),
@@ -879,12 +924,17 @@ class _DashboardPageState extends State<DashboardPage>
                             if (urgent == null ||
                                 important == null ||
                                 title.isEmpty ||
-                                selectedMission == null ||
                                 selectedContext == null ||
                                 dueDate == null) {
                               setModalState(() {
                                 errorText =
                                     "Please complete all task fields before saving.";
+                              });
+                              return;
+                            }
+                            if (_hasSubMissions && selectedMission == null) {
+                              setModalState(() {
+                                errorText = "Please select a sub-mission.";
                               });
                               return;
                             }
@@ -1219,10 +1269,7 @@ class _DashboardPageState extends State<DashboardPage>
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => TaskDetailsPage(
-                                title: task.title,
-                                submission: task.mission ?? "No Mission",
-                                dueDate: task.dueDate,
-                                context: task.context,
+                                task: task,
                                 onArchive: () async {
                                   final updated = task.copyWith(
                                     isArchived: true,
@@ -1233,6 +1280,15 @@ class _DashboardPageState extends State<DashboardPage>
                                 onDelete: () async {
                                   await _taskService.deleteTask(task.id);
                                   _loadTasks();
+                                },
+                                onUpdate: (updated) {
+                                  final index = _tasks.indexWhere(
+                                    (t) => t.id == updated.id,
+                                  );
+                                  if (index == -1) return;
+                                  setState(() {
+                                    _tasks[index] = updated;
+                                  });
                                 },
                               ),
                             ),

@@ -1,22 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:sptm/core/constants.dart';
+import 'package:sptm/models/task_item.dart';
+import 'package:sptm/services/task_service.dart';
 
 class TaskDetailsPage extends StatefulWidget {
-  final String title;
-  final String submission;
-  final DateTime? dueDate;
-  final String? context;
+  final TaskItem task;
   final VoidCallback? onDelete;
   final VoidCallback? onArchive;
+  final ValueChanged<TaskItem>? onUpdate;
 
   const TaskDetailsPage({
     super.key,
-    required this.title,
-    required this.submission,
-    this.dueDate,
-    this.context,
+    required this.task,
     this.onDelete,
     this.onArchive,
+    this.onUpdate,
   });
 
   @override
@@ -40,11 +38,33 @@ class _ChecklistItem {
 
 class _TaskDetailsPageState extends State<TaskDetailsPage> {
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _contextController = TextEditingController();
+  final TextEditingController _dueDateController = TextEditingController();
   final List<_ChecklistItem> _checklist = [];
+  final TaskService _taskService = TaskService();
+  late TaskItem _task;
+  DateTime? _dueDate;
+  bool _isEditing = false;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _task = widget.task;
+    _titleController.text = _task.title;
+    _descriptionController.text = _task.description ?? '';
+    _contextController.text = _task.context ?? '';
+    _dueDate = _task.dueDate;
+    _dueDateController.text = _dueDate != null ? _formatDate(_dueDate!) : '';
+  }
 
   @override
   void dispose() {
     _descriptionController.dispose();
+    _titleController.dispose();
+    _contextController.dispose();
+    _dueDateController.dispose();
     for (final item in _checklist) {
       item.dispose();
     }
@@ -132,6 +152,67 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
     Navigator.pop(context);
   }
 
+  Future<void> _pickDueDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? now,
+      firstDate: now.subtract(const Duration(days: 1)),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked == null) return;
+    setState(() {
+      _dueDate = picked;
+      _dueDateController.text = _formatDate(picked);
+    });
+  }
+
+  Future<void> _saveEdits() async {
+    if (_isSaving) return;
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task title is required.')),
+      );
+      return;
+    }
+
+    final updated = _task.copyWith(
+      title: title,
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      context: _contextController.text.trim().isEmpty
+          ? null
+          : _contextController.text.trim(),
+      dueDate: _dueDate,
+    );
+
+    setState(() => _isSaving = true);
+    try {
+      final saved = await _taskService.updateTask(updated);
+      if (!mounted) return;
+      setState(() {
+        _task = saved;
+        _titleController.text = saved.title;
+        _descriptionController.text = saved.description ?? '';
+        _contextController.text = saved.context ?? '';
+        _dueDate = saved.dueDate;
+        _dueDateController.text =
+            saved.dueDate != null ? _formatDate(saved.dueDate!) : '';
+        _isEditing = false;
+        _isSaving = false;
+      });
+      widget.onUpdate?.call(saved);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update task: $e')),
+      );
+    }
+  }
+
   Widget _actionIconButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -172,11 +253,31 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
       appBar: AppBar(
         backgroundColor: const Color(AppColors.surface),
         iconTheme: const IconThemeData(color: Color(AppColors.textMain)),
-        title: Text(
-          widget.title,
-          style: const TextStyle(color: Color(AppColors.textMain)),
-        ),
+        title: _isEditing
+            ? TextField(
+                controller: _titleController,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                style: const TextStyle(color: Color(AppColors.textMain)),
+                decoration: const InputDecoration(
+                  hintText: 'Task title',
+                  hintStyle: TextStyle(color: Color(AppColors.textMuted)),
+                  border: InputBorder.none,
+                ),
+                onSubmitted: (_) => _saveEdits(),
+              )
+            : Text(
+                _task.title,
+                style: const TextStyle(color: Color(AppColors.textMain)),
+              ),
         actions: [
+          _actionIconButton(
+            icon: _isEditing ? Icons.check : Icons.edit,
+            onTap: _isEditing
+                ? _saveEdits
+                : () => setState(() => _isEditing = true),
+            iconColor: const Color(AppColors.textMain),
+          ),
           _actionIconButton(
             icon: Icons.archive_outlined,
             onTap: _archiveTask,
@@ -214,7 +315,7 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        widget.submission,
+                        _task.mission ?? "No Mission",
                         style: const TextStyle(
                           color: Color(AppColors.textMain),
                           fontSize: 16,
@@ -222,12 +323,71 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        "${widget.dueDate != null ? "Due ${_formatDate(widget.dueDate!)}" : "No due date"} · ${widget.context ?? "No context"}",
-                        style: const TextStyle(
-                          color: Color(AppColors.textMuted),
+                      if (_isEditing) ...[
+                        TextField(
+                          controller: _dueDateController,
+                          readOnly: true,
+                          onTap: _pickDueDate,
+                          style: const TextStyle(
+                            color: Color(AppColors.textMain),
+                          ),
+                          decoration: InputDecoration(
+                            hintText: "Due date",
+                            hintStyle: const TextStyle(
+                              color: Color(AppColors.textMuted),
+                            ),
+                            filled: true,
+                            fillColor: const Color(AppColors.surfaceBase),
+                            suffixIcon: _dueDate != null
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.close,
+                                      color: Color(AppColors.textMuted),
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _dueDate = null;
+                                        _dueDateController.clear();
+                                      });
+                                    },
+                                  )
+                                : const Icon(
+                                    Icons.calendar_today,
+                                    color: Color(AppColors.textMuted),
+                                  ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _contextController,
+                          textInputAction: TextInputAction.done,
+                          style: const TextStyle(
+                            color: Color(AppColors.textMain),
+                          ),
+                          decoration: InputDecoration(
+                            hintText: "Context",
+                            hintStyle: const TextStyle(
+                              color: Color(AppColors.textMuted),
+                            ),
+                            filled: true,
+                            fillColor: const Color(AppColors.surfaceBase),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                      ] else
+                        Text(
+                          "${_task.dueDate != null ? "Due ${_formatDate(_task.dueDate!)}" : "No due date"} · ${_task.context ?? "No context"}",
+                          style: const TextStyle(
+                            color: Color(AppColors.textMuted),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -243,6 +403,7 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                 TextField(
                   controller: _descriptionController,
                   maxLines: 4,
+                  readOnly: !_isEditing,
                   style: const TextStyle(color: Color(AppColors.textMain)),
                   decoration: InputDecoration(
                     hintText: "Add details or notes for this task",
