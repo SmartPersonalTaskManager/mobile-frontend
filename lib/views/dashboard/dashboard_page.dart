@@ -121,8 +121,35 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
-  // No longer needed as we persist directly to API
-  Future<void> _saveTasks() async {}
+  Future<void> _toggleTaskDone(TaskItem task) async {
+    final index = _tasks.indexWhere((t) => t.id == task.id);
+    if (index == -1) return;
+
+    final optimistic = task.copyWith(
+      done: !task.done,
+      completedAt: !task.done ? DateTime.now() : null,
+    );
+
+    setState(() {
+      _tasks[index] = optimistic;
+    });
+
+    try {
+      final saved = await _taskService.updateTask(optimistic);
+      if (!mounted) return;
+      setState(() {
+        _tasks[index] = saved;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _tasks[index] = task;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to update task: $e")));
+    }
+  }
 
   Future<void> _toggleListening(StateSetter setModalState) async {
     if (_isListening) {
@@ -1216,6 +1243,7 @@ class _DashboardPageState extends State<DashboardPage>
                           subtitle:
                               "${task.mission ?? "No mission"} · ${task.context ?? "No context"} · ${task.dueDate != null ? _formatDate(task.dueDate!) : "No date"}",
                           done: task.done,
+                          onToggleDone: () => _toggleTaskDone(task),
                         ),
                       );
                     },
