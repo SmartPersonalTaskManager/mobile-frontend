@@ -186,9 +186,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.add, color: Color(AppColors.textMain)),
-                  onPressed: () {
-                    _showAddMissionDialog();
-                  },
+                  onPressed: _showAddMissionDialog,
                 ),
               ],
             ),
