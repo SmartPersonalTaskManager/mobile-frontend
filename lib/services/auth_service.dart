@@ -62,9 +62,16 @@ class AuthService {
       }
 
       await _authStorage.saveToken(token);
+      final prefs = await SharedPreferences.getInstance();
       if (id != null) {
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setInt("userId", (id as num).toInt());
+      }
+      await prefs.setString("email", email);
+      final username = body['username'] as String?;
+      if (username != null && username.trim().isNotEmpty) {
+        final trimmed = username.trim();
+        await prefs.setString("username", trimmed);
+        await prefs.setString("name", trimmed);
       }
       return;
     }
