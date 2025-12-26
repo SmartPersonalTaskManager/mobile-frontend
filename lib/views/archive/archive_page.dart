@@ -81,8 +81,8 @@ class _ArchivePageState extends State<ArchivePage> {
         top: false,
         child: RefreshIndicator(
           onRefresh: _loadArchivedTasks,
-          color: Colors.deepPurple,
-          backgroundColor: Colors.white,
+          color: const Color(AppColors.primary),
+          backgroundColor: const Color(AppColors.background),
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
