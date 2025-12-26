@@ -132,6 +132,21 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
     await prefs.setStringList(_tasksKey, payloads);
   }
 
+  Future<void> _toggleTaskDone(TaskItem task) async {
+    final index = _tasks.indexWhere((t) => t.id == task.id);
+    if (index == -1) return;
+
+    final updated = task.copyWith(
+      done: !task.done,
+      completedAt: !task.done ? DateTime.now() : null,
+    );
+
+    setState(() {
+      _tasks[index] = updated;
+    });
+    await _saveTasks();
+  }
+
   List<TaskItem> get _linkedTasks {
     return _tasks
         .where((task) => task.mission == widget.subMissionTitle)
@@ -272,6 +287,7 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
                               subtitle:
                                   "${task.context ?? "No context"} · ${task.dueDate != null ? _formatDate(task.dueDate!) : "No date"}",
                               done: task.done,
+                              onToggleDone: () => _toggleTaskDone(task),
                             ),
                           ),
                         );

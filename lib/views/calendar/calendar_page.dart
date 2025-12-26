@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sptm/core/constants.dart';
 import 'package:sptm/models/task_item.dart';
+import 'package:sptm/services/task_service.dart';
 import 'package:sptm/views/dashboard/widgets/task_card.dart';
 
 class CalendarPage extends StatefulWidget {
@@ -14,7 +13,6 @@ class CalendarPage extends StatefulWidget {
 }
 
 class _CalendarPageState extends State<CalendarPage> {
-  static const String _tasksKey = "dashboard_tasks";
   static const List<String> _monthNames = [
     'January',
     'February',
@@ -38,6 +36,7 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime _focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime? _selectedDay;
   final List<TaskItem> _tasks = [];
+  final TaskService _taskService = TaskService();
 
   @override
   void initState() {
@@ -59,48 +58,72 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _loadTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawItems = prefs.getStringList(_tasksKey) ?? [];
-    final loadedTasks = <TaskItem>[];
-    for (final raw in rawItems) {
-      try {
-        final decoded = jsonDecode(raw) as Map<String, dynamic>;
-        loadedTasks.add(TaskItem.fromJson(decoded));
-      } catch (_) {}
+    final selectedDay = _selectedDay;
+    if (selectedDay == null) {
+      if (!mounted) return;
+      setState(() {
+        _tasks.clear();
+      });
+      return;
     }
-    if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) return;
+
+    try {
+      final tasks = await _taskService.getTasksForDay(
+        userId: userId,
+        day: selectedDay,
+      );
+      if (!mounted) return;
+      setState(() {
+        _tasks
+          ..clear()
+          ..addAll(tasks.where((task) => !task.isArchived));
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load tasks: $e")));
+    }
+  }
+
+  Future<void> _toggleTaskDone(TaskItem task) async {
+    final index = _tasks.indexWhere((t) => t.id == task.id);
+    if (index == -1) return;
+
+    final optimistic = task.copyWith(
+      done: !task.done,
+      completedAt: !task.done ? DateTime.now() : null,
+    );
+
     setState(() {
-      _tasks
-        ..clear()
-        ..addAll(loadedTasks);
+      _tasks[index] = optimistic;
     });
+
+    try {
+      final saved = await _taskService.toggleTaskDone(task);
+      if (!mounted) return;
+      setState(() {
+        _tasks[index] = saved;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _tasks[index] = task;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to update task: $e")));
+    }
   }
 
   List<TaskItem> _tasksForSelectedDay() {
     final selectedDay = _selectedDay;
     if (selectedDay == null) return [];
-    return _tasks
-        .where((task) => _isSameDay(task.dueDate!, selectedDay))
-        .toList();
-  }
-
-  String _formatDate(DateTime value) {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    final month = months[value.month - 1];
-    return "$month ${value.day.toString().padLeft(2, "0")}";
+    return _tasks;
   }
 
   String _urgencyLabel(TaskItem task) {
@@ -274,84 +297,91 @@ class _CalendarPageState extends State<CalendarPage> {
     return Scaffold(
       backgroundColor: _background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 18),
-              _buildWeekdayLabels(),
-              const SizedBox(height: 12),
-              _buildCalendarGrid(),
-              const SizedBox(height: 24),
+        child: RefreshIndicator(
+          color: _accent,
+          backgroundColor: _background,
+          onRefresh: _loadTasks,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 18),
+                _buildWeekdayLabels(),
+                const SizedBox(height: 12),
+                _buildCalendarGrid(),
+                const SizedBox(height: 24),
 
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: _card,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          "Tasks due",
-                          style: TextStyle(
-                            color: Color(AppColors.textMain),
-                            fontWeight: FontWeight.w700,
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _card,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            "Tasks due",
+                            style: TextStyle(
+                              color: Color(AppColors.textMain),
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _selectedDay == null
-                              ? "-"
-                              : dueTasks.length.toString(),
-                          style: const TextStyle(
-                            color: Color(AppColors.textMuted),
-                            fontWeight: FontWeight.w600,
+                          const Spacer(),
+                          Text(
+                            _selectedDay == null
+                                ? "-"
+                                : dueTasks.length.toString(),
+                            style: const TextStyle(
+                              color: Color(AppColors.textMuted),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (_selectedDay == null)
-                      const Text(
-                        "Select a date to see tasks due that day.",
-                        style: TextStyle(color: Color(AppColors.textMuted)),
-                      )
-                    else if (dueTasks.isEmpty)
-                      const Text(
-                        "No tasks due on this date.",
-                        style: TextStyle(color: Color(AppColors.textMuted)),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: dueTasks.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final task = dueTasks[index];
-                          return TaskCard(
-                            title: task.title,
-                            subtitle:
-                                "${task.mission} · ${task.context} · ${_urgencyLabel(task)}",
-                            done: task.done,
-                          );
-                        },
+                        ],
                       ),
-                  ],
+                      const SizedBox(height: 12),
+                      if (_selectedDay == null)
+                        const Text(
+                          "Select a date to see tasks due that day.",
+                          style: TextStyle(color: Color(AppColors.textMuted)),
+                        )
+                      else if (dueTasks.isEmpty)
+                        const Text(
+                          "No tasks due on this date.",
+                          style: TextStyle(color: Color(AppColors.textMuted)),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: dueTasks.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final task = dueTasks[index];
+                            return TaskCard(
+                              title: task.title,
+                              subtitle:
+                                  "${task.mission} · ${task.context} · ${_urgencyLabel(task)}",
+                              done: task.done,
+                              onToggleDone: () => _toggleTaskDone(task),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -17,6 +17,20 @@ class TaskService {
     }
   }
 
+  Future<List<TaskItem>> getTasksForDay({
+    required int userId,
+    required DateTime day,
+  }) async {
+    final tasks = await getTasks(userId);
+    return tasks.where((task) {
+      final dueDate = task.dueDate;
+      return dueDate != null &&
+          dueDate.year == day.year &&
+          dueDate.month == day.month &&
+          dueDate.day == day.day;
+    }).toList();
+  }
+
   Future<TaskItem> createTask({
     required String title,
     required int userId,
@@ -73,6 +87,14 @@ class TaskService {
     } else {
       throw ApiException("Failed to update task");
     }
+  }
+
+  Future<TaskItem> toggleTaskDone(TaskItem task) async {
+    final updated = task.copyWith(
+      done: !task.done,
+      completedAt: !task.done ? DateTime.now() : null,
+    );
+    return updateTask(updated);
   }
 
   Future<void> deleteTask(int taskId) async {

@@ -135,7 +135,7 @@ class _DashboardPageState extends State<DashboardPage>
     });
 
     try {
-      final saved = await _taskService.updateTask(optimistic);
+      final saved = await _taskService.toggleTaskDone(task);
       if (!mounted) return;
       setState(() {
         _tasks[index] = saved;
