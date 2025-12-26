@@ -5,12 +5,14 @@ class TaskCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool done;
+  final VoidCallback? onToggleDone;
 
   const TaskCard({
     super.key,
     required this.title,
     required this.subtitle,
     this.done = false,
+    this.onToggleDone,
   });
 
   @override
@@ -24,7 +26,7 @@ class TaskCard extends StatelessWidget {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () {},
+            onTap: onToggleDone,
             child: Container(
               width: 36,
               height: 36,
