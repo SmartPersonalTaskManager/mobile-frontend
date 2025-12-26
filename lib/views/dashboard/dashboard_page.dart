@@ -1001,21 +1001,26 @@ class _DashboardPageState extends State<DashboardPage>
     return AppBar(
       backgroundColor: const Color(AppColors.background),
       elevation: 0,
-      leadingWidth: 56,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: CircleAvatar(
-          backgroundColor: const Color(AppColors.surfaceBase),
-          backgroundImage: profileImagePath != null
-              ? ResizeImage(
-                  FileImage(File(profileImagePath!)),
-                  width: 100,
-                  height: 100,
-                )
-              : null,
-          child: profileImagePath == null
-              ? const Icon(Icons.person, color: Color(AppColors.textMain))
-              : null,
+      leadingWidth: 160,
+      leading: const Padding(
+        padding: EdgeInsets.only(left: 16),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              "Dashboard",
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Color(AppColors.textMain),
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ),
       ),
       actions: [
@@ -1047,22 +1052,24 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildHeader() {
     return Row(
       children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-
-            child: Text(
-              '$todaysDate',
-              style: const TextStyle(
-                color: Color(AppColors.textMain),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Color(AppColors.textMain)),
+          ),
+          child: Text(
+            '$todaysDate',
+            style: const TextStyle(
+              color: Color(AppColors.textMain),
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
+        const Spacer(),
         IconButton(
           icon: const Icon(
             Icons.inbox_outlined,
