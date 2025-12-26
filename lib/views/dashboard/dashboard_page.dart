@@ -85,7 +85,8 @@ class _DashboardPageState extends State<DashboardPage>
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString("name") ?? "";
+    final fullName =
+        prefs.getString("name") ?? prefs.getString("username") ?? "";
     final img = prefs.getString("img");
 
     if (!mounted) return;
