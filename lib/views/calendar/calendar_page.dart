@@ -162,7 +162,7 @@ class _CalendarPageState extends State<CalendarPage> {
           'Calendar',
           style: TextStyle(
             color: Color(AppColors.textMain),
-            fontSize: 24,
+            fontSize: 28,
             fontWeight: FontWeight.bold,
           ),
         ),
