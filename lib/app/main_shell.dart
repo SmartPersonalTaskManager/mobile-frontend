@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:sptm/views/archive/archive_page.dart';
 import 'package:sptm/views/calendar/calendar_page.dart';
@@ -72,7 +73,10 @@ class _MainShellState extends State<MainShell> {
                 ), // missions
                 _navItem(icon: Icons.calendar_month, itemIndex: 2), // calendar
                 _navItem(icon: Icons.insights, itemIndex: 3), // insights
-                _navItem(icon: Icons.archive, itemIndex: 4), // archive
+                _navItem(
+                  icon: CupertinoIcons.archivebox_fill,
+                  itemIndex: 4,
+                ), // archive
               ],
             ),
           ),
