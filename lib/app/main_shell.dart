@@ -57,10 +57,11 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: BottomAppBar(
-          color: const Color(AppColors.surface),
+          color: const Color(AppColors.background),
+          surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
           shape: const CircularNotchedRectangle(),
           notchMargin: 6,
-          elevation: 10,
+          elevation: 3,
           child: SizedBox(
             height: 52,
             child: Row(

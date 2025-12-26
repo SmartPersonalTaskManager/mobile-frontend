@@ -37,7 +37,7 @@ class _NotificationsPageState extends State<NotificationsPage>
 
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(AppColors.background),
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Color(AppColors.textMain)),
@@ -48,6 +48,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         style: TextStyle(
           color: Color(AppColors.textMain),
           fontWeight: FontWeight.bold,
+          fontSize: 28,
         ),
       ),
       actions: [

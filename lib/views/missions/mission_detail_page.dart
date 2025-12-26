@@ -199,11 +199,15 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
     return Scaffold(
       backgroundColor: const Color(AppColors.background),
       appBar: AppBar(
-        backgroundColor: const Color(AppColors.surface),
+        backgroundColor: const Color(AppColors.background),
         iconTheme: const IconThemeData(color: Color(AppColors.textMain)),
         title: Text(
           _missionTitle,
-          style: const TextStyle(color: Color(AppColors.textMain)),
+          style: const TextStyle(
+            color: Color(AppColors.textMain),
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           IconButton(
@@ -373,11 +377,15 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
     return Scaffold(
       backgroundColor: const Color(AppColors.background),
       appBar: AppBar(
-        backgroundColor: const Color(AppColors.surface),
+        backgroundColor: const Color(AppColors.background),
         iconTheme: const IconThemeData(color: Color(AppColors.textMain)),
         title: Text(
           widget.subMissionTitle,
-          style: const TextStyle(color: Color(AppColors.textMain)),
+          style: const TextStyle(
+            color: Color(AppColors.textMain),
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: SafeArea(

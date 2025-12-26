@@ -180,7 +180,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Color(AppColors.textMain),
-                    fontSize: 25,
+                    fontSize: 28,
                   ),
                 ),
                 const Spacer(),

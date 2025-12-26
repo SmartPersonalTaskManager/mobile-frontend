@@ -27,7 +27,11 @@ class _ArchivePageState extends State<ArchivePage> {
   Future<void> _loadArchivedTasks() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
-    if (userId == null) return;
+    if (userId == null) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       final allTasks = await _taskService.getTasks(userId);
@@ -46,14 +50,35 @@ class _ArchivePageState extends State<ArchivePage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0B0F14),
+        backgroundColor: Color(AppColors.background),
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0F14),
+      backgroundColor: const Color(AppColors.background),
+      appBar: AppBar(
+        backgroundColor: const Color(AppColors.background),
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 16,
+        title: const Text(
+          "Archive",
+          style: TextStyle(
+            color: Color(AppColors.textMain),
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: const [
+          _IconCircle(icon: Icons.light_mode_outlined),
+          SizedBox(width: 12),
+          _IconCircle(icon: Icons.search),
+          SizedBox(width: 12),
+        ],
+      ),
       body: SafeArea(
+        top: false,
         child: RefreshIndicator(
           onRefresh: _loadArchivedTasks,
           color: Colors.deepPurple,
@@ -67,7 +92,11 @@ class _ArchivePageState extends State<ArchivePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _Header(),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Review your accomplishments",
+                        style: TextStyle(color: Color(AppColors.textMuted)),
+                      ),
                       const SizedBox(height: 16),
                       _TopControls(completedCount: _tasks.length),
                       const SizedBox(height: 16),
@@ -117,57 +146,6 @@ class _ArchivePageState extends State<ArchivePage> {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
-              "Archive",
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              "Review your accomplishments",
-              style: TextStyle(color: Colors.white54),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            _IconCircle(icon: Icons.light_mode_outlined),
-            const SizedBox(width: 12),
-            _IconCircle(icon: Icons.search),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _IconCircle extends StatelessWidget {
-  final IconData icon;
-  const _IconCircle({required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return CircleAvatar(
-      backgroundColor: const Color(0xFF161B22),
-      child: Icon(icon, color: Colors.white),
-    );
-  }
-}
-
 class _TopControls extends StatelessWidget {
   final int completedCount;
   const _TopControls({required this.completedCount});
@@ -200,6 +178,19 @@ class _TopControls extends StatelessWidget {
           style: const TextStyle(color: Colors.white54),
         ),
       ],
+    );
+  }
+}
+
+class _IconCircle extends StatelessWidget {
+  final IconData icon;
+  const _IconCircle({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      backgroundColor: const Color(AppColors.surface),
+      child: Icon(icon, color: const Color(AppColors.textMain)),
     );
   }
 }
@@ -290,7 +281,7 @@ class _TaskCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
+          color: const Color(AppColors.surface),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(

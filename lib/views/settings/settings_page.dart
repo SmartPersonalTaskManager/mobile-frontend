@@ -237,11 +237,15 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       backgroundColor: const Color(AppColors.background),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(AppColors.background),
         elevation: 0,
         title: const Text(
           "Settings",
-          style: TextStyle(color: Color(AppColors.textMain)),
+          style: TextStyle(
+            color: Color(AppColors.textMain),
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(AppColors.textMain)),

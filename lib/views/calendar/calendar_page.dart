@@ -158,15 +158,6 @@ class _CalendarPageState extends State<CalendarPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Calendar',
-          style: TextStyle(
-            color: Color(AppColors.textMain),
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
         Row(
           children: [
             IconButton(
@@ -296,7 +287,22 @@ class _CalendarPageState extends State<CalendarPage> {
 
     return Scaffold(
       backgroundColor: _background,
+      appBar: AppBar(
+        backgroundColor: const Color(AppColors.background),
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 16,
+        title: const Text(
+          'Calendar',
+          style: TextStyle(
+            color: Color(AppColors.textMain),
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       body: SafeArea(
+        top: false,
         child: RefreshIndicator(
           color: _accent,
           backgroundColor: _background,
@@ -308,7 +314,7 @@ class _CalendarPageState extends State<CalendarPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 _buildWeekdayLabels(),
                 const SizedBox(height: 12),
                 _buildCalendarGrid(),
