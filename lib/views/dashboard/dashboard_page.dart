@@ -160,11 +160,19 @@ class _DashboardPageState extends State<DashboardPage>
         ),
       ];
     }
-    return _subMissionTitles
-        .map(
-          (title) => DropdownMenuItem<String>(value: title, child: Text(title)),
-        )
-        .toList();
+    final items = <DropdownMenuItem<String>>[
+      const DropdownMenuItem<String>(
+        value: "__none__",
+        child: Text("No sub-mission"),
+      ),
+    ];
+    items.addAll(
+      _subMissionTitles.map(
+        (title) =>
+            DropdownMenuItem<String>(value: title, child: Text(title)),
+      ),
+    );
+    return items;
   }
 
   Future<void> _toggleTaskDone(TaskItem task) async {
@@ -417,7 +425,9 @@ class _DashboardPageState extends State<DashboardPage>
                         }
                         await _saveQuickCaptureTask(
                           _quickTaskController.text.trim(),
-                          selectedMission,
+                          selectedMission == "__none__"
+                              ? null
+                              : selectedMission,
                         );
                         if (_isListening) {
                           await _speech.stop();
@@ -744,7 +754,7 @@ class _DashboardPageState extends State<DashboardPage>
                         value: selectedMission,
                         hint: Text(
                           _hasSubMissions
-                              ? "Linked sub-mission"
+                              ? "Linked sub-mission (optional)"
                               : "No sub-missions available",
                           style: const TextStyle(
                             color: Color(AppColors.textMuted),
@@ -932,13 +942,6 @@ class _DashboardPageState extends State<DashboardPage>
                               });
                               return;
                             }
-                            if (_hasSubMissions && selectedMission == null) {
-                              setModalState(() {
-                                errorText = "Please select a sub-mission.";
-                              });
-                              return;
-                            }
-
                             final prefs = await SharedPreferences.getInstance();
                             final userId = prefs.getInt("userId");
 
@@ -954,7 +957,9 @@ class _DashboardPageState extends State<DashboardPage>
                               final newTask = await _taskService.createTask(
                                 title: title,
                                 userId: userId,
-                                mission: selectedMission,
+                                mission: selectedMission == "__none__"
+                                    ? null
+                                    : selectedMission,
                                 context: selectedContext,
                                 dueDate: dueDate,
                                 urgent: urgent ?? false,
