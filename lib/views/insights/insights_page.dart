@@ -5,6 +5,7 @@ import 'package:sptm/models/weekly_stats.dart';
 import 'package:sptm/models/task_item.dart';
 import 'package:sptm/services/analytics_service.dart';
 import 'package:sptm/services/task_service.dart';
+import 'package:sptm/views/widgets/app_bar.dart';
 
 class InsightsPage extends StatefulWidget {
   const InsightsPage({super.key});
@@ -20,6 +21,7 @@ class _InsightsPageState extends State<InsightsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0E1117),
+      appBar: const SPTMAppBar(title: "Insights"),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadStats,
@@ -50,26 +52,12 @@ class _InsightsPageState extends State<InsightsPage> {
   Widget _buildHeader() {
     return Row(
       children: [
-        const CircleAvatar(radius: 22, backgroundColor: Color(0xFFFFD6C9)),
-        const SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
-            Text(
-              "Insights",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
             Text("Weekly Analysis", style: TextStyle(color: Colors.white54)),
           ],
         ),
-        const Spacer(),
-        Icon(Icons.notifications_none, color: Colors.white),
-        const SizedBox(width: 16),
-        Icon(Icons.settings_outlined, color: Colors.white),
       ],
     );
   }

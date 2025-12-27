@@ -4,6 +4,7 @@ import 'package:sptm/core/constants.dart';
 import 'package:sptm/models/mission.dart';
 import 'package:sptm/services/mission_service.dart';
 import 'package:sptm/views/missions/mission_detail_page.dart';
+import 'package:sptm/views/widgets/app_bar.dart';
 
 class MissionsListPage extends StatefulWidget {
   const MissionsListPage({super.key});
@@ -266,6 +267,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: const SPTMAppBar(title: "Missions"),
       backgroundColor: const Color(AppColors.background),
       body: SafeArea(
         bottom: false,

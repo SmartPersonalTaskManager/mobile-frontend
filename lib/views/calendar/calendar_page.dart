@@ -4,6 +4,7 @@ import 'package:sptm/core/constants.dart';
 import 'package:sptm/models/task_item.dart';
 import 'package:sptm/services/task_service.dart';
 import 'package:sptm/views/dashboard/widgets/task_card.dart';
+import 'package:sptm/views/widgets/app_bar.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -287,20 +288,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
     return Scaffold(
       backgroundColor: _background,
-      appBar: AppBar(
-        backgroundColor: const Color(AppColors.background),
-        elevation: 0,
-        centerTitle: false,
-        titleSpacing: 16,
-        title: const Text(
-          'Calendar',
-          style: TextStyle(
-            color: Color(AppColors.textMain),
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      appBar: const SPTMAppBar(title: "Calendar"),
       body: SafeArea(
         top: false,
         child: RefreshIndicator(

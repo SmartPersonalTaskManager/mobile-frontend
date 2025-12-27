@@ -5,6 +5,7 @@ import 'package:sptm/services/task_service.dart';
 import 'package:sptm/core/constants.dart';
 
 import 'package:flutter/material.dart';
+import 'package:sptm/views/widgets/app_bar.dart';
 
 class ArchivePage extends StatefulWidget {
   const ArchivePage({super.key});
@@ -164,26 +165,7 @@ class _ArchivePageState extends State<ArchivePage> {
 
     return Scaffold(
       backgroundColor: const Color(AppColors.background),
-      appBar: AppBar(
-        backgroundColor: const Color(AppColors.background),
-        elevation: 0,
-        centerTitle: false,
-        titleSpacing: 16,
-        title: const Text(
-          "Archive",
-          style: TextStyle(
-            color: Color(AppColors.textMain),
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: const [
-          _IconCircle(icon: Icons.light_mode_outlined),
-          SizedBox(width: 12),
-          _IconCircle(icon: Icons.search),
-          SizedBox(width: 12),
-        ],
-      ),
+      appBar: const SPTMAppBar(title: "Archive"),
       body: SafeArea(
         top: false,
         child: RefreshIndicator(

@@ -10,6 +10,7 @@ import 'package:sptm/views/dashboard/widgets/task_card.dart';
 import 'package:sptm/views/notifications/notifications_page.dart';
 import 'package:sptm/views/settings/settings_page.dart';
 import 'package:sptm/views/tasks/task_details_page.dart';
+import 'package:sptm/views/widgets/app_bar.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -194,60 +195,6 @@ class _DashboardPageState extends State<DashboardPage>
       ).showSnackBar(SnackBar(content: Text("Failed to update task: $e")));
     }
   }
-
-  /*Future<void> _toggleListening(StateSetter setModalState) async {
-    if (_isListening) {
-      //await _speech.stop();
-      if (!mounted) return;
-      setState(() => _isListening = false);
-      setModalState(() => _isListening = false);
-      _listeningPulseController.stop();
-      _listeningPulseController.value = 0;
-      return;
-    }
-
-    final available = await _speech.initialize(
-      onStatus: (status) {
-        if (!mounted) return;
-        if (status == "done" || status == "notListening") {
-          setState(() => _isListening = false);
-          if (_isQuickCaptureOpen) {
-            setModalState(() => _isListening = false);
-          }
-        }
-      },
-      onError: (error) {
-        if (!mounted) return;
-        setState(() => _isListening = false);
-        if (_isQuickCaptureOpen) {
-          setModalState(() => _isListening = false);
-        }
-      },
-    );
-
-    if (!available) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Speech recognition unavailable.")),
-      );
-      return;
-    }
-
-    setState(() => _isListening = true);
-    setModalState(() => _isListening = true);
-    _quickTaskFocusNode.requestFocus();
-    _listeningPulseController.repeat(reverse: true);
-    await _speech.listen(
-      onResult: (result) {
-        if (!mounted) return;
-        _quickTaskController.text = result.recognizedWords;
-        _quickTaskController.selection = TextSelection.fromPosition(
-          TextPosition(offset: _quickTaskController.text.length),
-        );
-        setModalState(() {});
-      },
-    );
-  }*/
 
   Future<void> _openQuickCaptureSheet() async {
     _quickTaskController.clear();
@@ -990,63 +937,6 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  // ... (keeping other methods like _buildAppBar, _buildHeader, etc.) we just need to end the replacement correctly.
-  // Actually I should be careful not to delete the entire file.
-  // The block I selected covers from 85 to 800 roughly.
-  // I will narrow down replacements to function bodies.
-
-  AppBar _buildAppBar() {
-    return AppBar(
-      backgroundColor: const Color(AppColors.background),
-      elevation: 0,
-      leadingWidth: 160,
-      leading: const Padding(
-        padding: EdgeInsets.only(left: 16),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              "Dashboard",
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Color(AppColors.textMain),
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(
-            Icons.notifications,
-            color: Color(AppColors.textMain),
-          ),
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const NotificationsPage(),
-              ),
-            );
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings, color: Color(AppColors.textMain)),
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const SettingsPage()),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _buildHeader() {
     return Row(
       children: [
@@ -1319,7 +1209,7 @@ class _DashboardPageState extends State<DashboardPage>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(AppColors.background),
-      appBar: _buildAppBar(),
+      appBar: const SPTMAppBar(title: "Dashboard"),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
