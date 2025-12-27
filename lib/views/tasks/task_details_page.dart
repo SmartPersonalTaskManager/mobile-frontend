@@ -152,6 +152,34 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
     Navigator.pop(context);
   }
 
+  Future<void> _toggleComplete() async {
+    // Toggle logic
+    final newStatus = !_task.done;
+    final updated = _task.copyWith(done: newStatus);
+    // Note: copyWith(done:...) doesn't exist in backend DTO logic directly,
+    // but TaskItem.toJson handles 'done' -> 'status'.
+    // We need to ensure we set the status correctly if we rely on toJson.
+    // Actually TaskItem logic: 'status': done ? "COMPLETED" : "NOT_STARTED"
+    // So updating 'done' is sufficient for toJson to send correct status.
+
+    setState(() => _isSaving = true);
+    try {
+      final saved = await _taskService.updateTask(updated);
+      if (!mounted) return;
+      setState(() {
+        _task = saved;
+        _isSaving = false;
+      });
+      widget.onUpdate?.call(saved);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
+    }
+  }
+
   Future<void> _pickDueDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -171,9 +199,9 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
     if (_isSaving) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Task title is required.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Task title is required.')));
       return;
     }
 
@@ -198,8 +226,9 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
         _descriptionController.text = saved.description ?? '';
         _contextController.text = saved.context ?? '';
         _dueDate = saved.dueDate;
-        _dueDateController.text =
-            saved.dueDate != null ? _formatDate(saved.dueDate!) : '';
+        _dueDateController.text = saved.dueDate != null
+            ? _formatDate(saved.dueDate!)
+            : '';
         _isEditing = false;
         _isSaving = false;
       });
@@ -207,9 +236,9 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update task: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
     }
   }
 
@@ -285,6 +314,13 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                 ? _saveEdits
                 : () => setState(() => _isEditing = true),
             iconColor: const Color(AppColors.textMain),
+          ),
+          _actionIconButton(
+            icon: _task.done ? Icons.undo : Icons.check_circle_outline,
+            onTap: _toggleComplete,
+            iconColor: _task.done
+                ? const Color(AppColors.textMuted)
+                : const Color(AppColors.success),
           ),
           _actionIconButton(
             icon: Icons.archive_outlined,

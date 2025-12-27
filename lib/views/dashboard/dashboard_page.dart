@@ -1,9 +1,6 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+//import 'package:speech_to_text/speech_to_text.dart';
 import 'package:sptm/core/constants.dart';
 import 'package:sptm/models/mission.dart';
 import 'package:sptm/models/task_item.dart';
@@ -30,7 +27,7 @@ class _DashboardPageState extends State<DashboardPage>
   String? profileImagePath;
   final TextEditingController _quickTaskController = TextEditingController();
   final FocusNode _quickTaskFocusNode = FocusNode();
-  final SpeechToText _speech = SpeechToText();
+  //final SpeechToText _speech = SpeechToText();
   late final AnimationController _listeningPulseController;
   late final Animation<double> _listeningPulse;
   bool _isListening = false;
@@ -66,7 +63,7 @@ class _DashboardPageState extends State<DashboardPage>
     _quickTaskController.dispose();
     _quickTaskFocusNode.dispose();
     _listeningPulseController.dispose();
-    _speech.stop();
+    //_speech.stop();
     super.dispose();
   }
 
@@ -198,9 +195,9 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
-  Future<void> _toggleListening(StateSetter setModalState) async {
+  /*Future<void> _toggleListening(StateSetter setModalState) async {
     if (_isListening) {
-      await _speech.stop();
+      //await _speech.stop();
       if (!mounted) return;
       setState(() => _isListening = false);
       setModalState(() => _isListening = false);
@@ -250,7 +247,7 @@ class _DashboardPageState extends State<DashboardPage>
         setModalState(() {});
       },
     );
-  }
+  }*/
 
   Future<void> _openQuickCaptureSheet() async {
     _quickTaskController.clear();
@@ -344,7 +341,7 @@ class _DashboardPageState extends State<DashboardPage>
                                   ),
                                 ),
                               ),
-                            IconButton(
+                            /*IconButton(
                               icon: Icon(
                                 _isListening ? Icons.mic : Icons.mic_none,
                                 color: _isListening
@@ -352,7 +349,7 @@ class _DashboardPageState extends State<DashboardPage>
                                     : const Color(AppColors.textMuted),
                               ),
                               onPressed: () => _toggleListening(setModalState),
-                            ),
+                            ),*/
                           ],
                         ),
                       ),
@@ -421,7 +418,7 @@ class _DashboardPageState extends State<DashboardPage>
                           selectedMission,
                         );
                         if (_isListening) {
-                          await _speech.stop();
+                          //await _speech.stop();
                           if (!mounted) return;
                           setState(() => _isListening = false);
                           _listeningPulseController.stop();
@@ -440,7 +437,7 @@ class _DashboardPageState extends State<DashboardPage>
       },
     );
     if (_isListening) {
-      await _speech.stop();
+      //await _speech.stop();
       if (mounted) {
         setState(() => _isListening = false);
       }
