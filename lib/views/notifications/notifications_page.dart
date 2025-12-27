@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sptm/core/constants.dart';
+import 'package:sptm/models/context_tag.dart';
+import 'package:sptm/models/mission.dart';
 import 'package:sptm/models/task_item.dart';
+import 'package:sptm/services/context_service.dart';
+import 'package:sptm/services/mission_service.dart';
 import 'package:sptm/services/notification_service.dart';
 import 'package:sptm/services/task_service.dart';
 
@@ -24,8 +28,12 @@ class _NotificationsPageState extends State<NotificationsPage>
   late TabController tabController;
   late NotificationService service;
   final TaskService _taskService = TaskService();
+  final ContextService _contextService = ContextService();
+  final MissionService _missionService = MissionService();
   List<NotificationItem> items = [];
   List<TaskItem> inboxTasks = [];
+  final List<ContextTag> _contexts = [];
+  final List<SubMission> _subMissions = [];
 
   @override
   void initState() {
@@ -90,6 +98,547 @@ class _NotificationsPageState extends State<NotificationsPage>
         SnackBar(content: Text("Failed to load inbox tasks: $e")),
       );
     }
+  }
+
+  Future<void> _loadContexts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) return;
+
+    try {
+      final contexts = await _contextService.fetchUserContexts(userId);
+      _contexts
+        ..clear()
+        ..addAll(contexts);
+    } catch (_) {
+      // ignore failures here; handled in the sheet if needed
+    }
+  }
+
+  Future<void> _loadSubMissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) return;
+
+    try {
+      final missions = await _missionService.fetchUserMissions(userId);
+      final loaded = <SubMission>[];
+      for (final Mission mission in missions) {
+        for (final SubMission subMission in mission.subMissions) {
+          if (subMission.title.trim().isNotEmpty) {
+            loaded.add(subMission);
+          }
+        }
+      }
+      _subMissions
+        ..clear()
+        ..addAll(loaded..sort((a, b) => a.title.compareTo(b.title)));
+    } catch (_) {
+      // ignore failures here; handled in the sheet if needed
+    }
+  }
+
+  bool get _hasSubMissions => _subMissions.isNotEmpty;
+
+  List<DropdownMenuItem<int>> _buildSubMissionItems() {
+    if (_subMissions.isEmpty) {
+      return const [
+        DropdownMenuItem<int>(
+          value: -1,
+          child: Text("No sub-missions available"),
+        ),
+      ];
+    }
+    return _subMissions
+        .map(
+          (subMission) => DropdownMenuItem<int>(
+            value: subMission.id,
+            child: Text(subMission.title),
+          ),
+        )
+        .toList();
+  }
+
+  String _formatDate(DateTime value) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    final month = months[value.month - 1];
+    return "$month ${value.day.toString().padLeft(2, "0")}";
+  }
+
+  Future<void> _openQuickTaskAssignmentSheet(TaskItem task) async {
+    await _loadSubMissions();
+    await _loadContexts();
+    final titleController = TextEditingController(text: task.title);
+    final dueDateController = TextEditingController(
+      text: task.dueDate == null ? "" : _formatDate(task.dueDate!),
+    );
+    bool? urgent = task.urgent;
+    bool? important = task.important;
+    int? selectedSubMissionId = task.subMissionId;
+    String? selectedContext = task.context;
+    DateTime? dueDate = task.dueDate;
+    String? errorText;
+
+    Future<void> selectDueDate(StateSetter setModalState) async {
+      final now = DateTime.now();
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: dueDate ?? now,
+        firstDate: now.subtract(const Duration(days: 1)),
+        lastDate: DateTime(now.year + 5),
+      );
+      if (picked == null) return;
+      dueDate = picked;
+      dueDateController.text = _formatDate(picked);
+      setModalState(() {
+        errorText = null;
+      });
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(AppColors.surface),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (errorText != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(AppColors.surfaceBase),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(AppColors.danger).withOpacity(0.6),
+                        ),
+                      ),
+                      child: Text(
+                        errorText!,
+                        style: const TextStyle(
+                          color: Color(AppColors.textMain),
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: errorText == null ? 16 : 0,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            "Create Full Task",
+                            style: TextStyle(
+                              color: Color(AppColors.textMain),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.close,
+                              color: Color(AppColors.textMuted),
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<bool>(
+                        value: urgent,
+                        hint: const Text(
+                          "Task urgency",
+                          style: TextStyle(color: Color(AppColors.textMuted)),
+                        ),
+                        dropdownColor: const Color(AppColors.surface),
+                        iconEnabledColor: const Color(AppColors.textMuted),
+                        style: const TextStyle(
+                          color: Color(AppColors.textMain),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: true, child: Text("Urgent")),
+                          DropdownMenuItem(
+                            value: false,
+                            child: Text("Not urgent"),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setModalState(() {
+                            urgent = value;
+                            errorText = null;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(AppColors.surfaceBase),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<bool>(
+                        value: important,
+                        hint: const Text(
+                          "Task importance",
+                          style: TextStyle(color: Color(AppColors.textMuted)),
+                        ),
+                        dropdownColor: const Color(AppColors.surface),
+                        iconEnabledColor: const Color(AppColors.textMuted),
+                        style: const TextStyle(
+                          color: Color(AppColors.textMain),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: true,
+                            child: Text("Important"),
+                          ),
+                          DropdownMenuItem(
+                            value: false,
+                            child: Text("Not important"),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setModalState(() {
+                            important = value;
+                            errorText = null;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(AppColors.surfaceBase),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: titleController,
+                        textInputAction: TextInputAction.next,
+                        onChanged: (_) {
+                          setModalState(() {
+                            errorText = null;
+                          });
+                        },
+                        style: const TextStyle(
+                          color: Color(AppColors.textMain),
+                          fontSize: 16,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: "Task title",
+                          hintStyle: const TextStyle(
+                            color: Color(AppColors.textMuted),
+                          ),
+                          filled: true,
+                          fillColor: const Color(AppColors.surfaceBase),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        value: selectedSubMissionId,
+                        hint: Text(
+                          _hasSubMissions
+                              ? "Linked sub-mission"
+                              : "No sub-missions available",
+                          style: const TextStyle(
+                            color: Color(AppColors.textMuted),
+                          ),
+                        ),
+                        dropdownColor: const Color(AppColors.surface),
+                        iconEnabledColor: const Color(AppColors.textMuted),
+                        style: const TextStyle(
+                          color: Color(AppColors.textMain),
+                        ),
+                        items: _buildSubMissionItems(),
+                        onChanged: _hasSubMissions
+                            ? (value) {
+                                setModalState(() {
+                                  selectedSubMissionId =
+                                      value == null || value == -1
+                                          ? null
+                                          : value;
+                                  errorText = null;
+                                });
+                              }
+                            : null,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(AppColors.surfaceBase),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedContext,
+                        hint: const Text(
+                          "Context",
+                          style: TextStyle(color: Color(AppColors.textMuted)),
+                        ),
+                        dropdownColor: const Color(AppColors.surface),
+                        iconEnabledColor: const Color(AppColors.textMuted),
+                        style: const TextStyle(
+                          color: Color(AppColors.textMain),
+                        ),
+                        items: [
+                          ..._contexts.map(
+                            (contextTag) => DropdownMenuItem(
+                              value: contextTag.name,
+                              child: Text(contextTag.name),
+                            ),
+                          ),
+                          const DropdownMenuItem(
+                            value: "__add__",
+                            child: Text("Add new context..."),
+                          ),
+                        ],
+                        onChanged: (value) async {
+                          if (value == "__add__") {
+                            final controller = TextEditingController();
+                            final result = await showDialog<String>(
+                              context: context,
+                              builder: (context) {
+                                return AlertDialog(
+                                  backgroundColor: const Color(
+                                    AppColors.surface,
+                                  ),
+                                  title: const Text(
+                                    "Add Context",
+                                    style: TextStyle(
+                                      color: Color(AppColors.textMain),
+                                    ),
+                                  ),
+                                  content: TextField(
+                                    controller: controller,
+                                    autofocus: true,
+                                    textInputAction: TextInputAction.done,
+                                    style: const TextStyle(
+                                      color: Color(AppColors.textMain),
+                                    ),
+                                    decoration: const InputDecoration(
+                                      hintText: "e.g. @errands",
+                                      hintStyle: TextStyle(
+                                        color: Color(AppColors.textMuted),
+                                      ),
+                                    ),
+                                    onSubmitted: (_) {
+                                      Navigator.of(
+                                        context,
+                                      ).pop(controller.text);
+                                    },
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.of(
+                                        context,
+                                      ).pop(controller.text),
+                                      child: const Text("Add"),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                            final rawContext = result?.trim();
+                            if (rawContext == null || rawContext.isEmpty) {
+                              return;
+                            }
+                            final newContext = rawContext.startsWith("@")
+                                ? rawContext
+                                : "@$rawContext";
+                            final alreadyExists = _contexts.any(
+                              (contextTag) => contextTag.name == newContext,
+                            );
+                            if (!alreadyExists) {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              final userId = prefs.getInt("userId");
+                              if (userId == null) {
+                                if (!mounted) return;
+                                setModalState(() {
+                                  errorText =
+                                      "Missing user info for context creation.";
+                                });
+                                return;
+                              }
+                              try {
+                                final created = await _contextService
+                                    .createContext(
+                                      userId: userId,
+                                      name: newContext,
+                                    );
+                                _contexts.add(created);
+                              } catch (e) {
+                                if (!mounted) return;
+                                setModalState(() {
+                                  errorText = "Failed to create context: $e";
+                                });
+                                return;
+                              }
+                            }
+                            setModalState(() {
+                              selectedContext = newContext;
+                              errorText = null;
+                            });
+                          } else {
+                            setModalState(() {
+                              selectedContext = value;
+                              errorText = null;
+                            });
+                          }
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(AppColors.surfaceBase),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: dueDateController,
+                        readOnly: true,
+                        onTap: () => selectDueDate(setModalState),
+                        style: const TextStyle(
+                          color: Color(AppColors.textMain),
+                          fontSize: 16,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: "Due date",
+                          hintStyle: const TextStyle(
+                            color: Color(AppColors.textMuted),
+                          ),
+                          suffixIcon: const Icon(
+                            Icons.calendar_today,
+                            color: Color(AppColors.textMuted),
+                            size: 18,
+                          ),
+                          filled: true,
+                          fillColor: const Color(AppColors.surfaceBase),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(AppColors.primary),
+                            foregroundColor: const Color(
+                              AppColors.textInverted,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final title = titleController.text.trim();
+                            if (urgent == null ||
+                                important == null ||
+                                title.isEmpty ||
+                                selectedContext == null ||
+                                dueDate == null) {
+                              setModalState(() {
+                                errorText =
+                                    "Please complete all task fields before saving.";
+                              });
+                              return;
+                            }
+                            if (_hasSubMissions &&
+                                selectedSubMissionId == null) {
+                              setModalState(() {
+                                errorText = "Please select a sub-mission.";
+                              });
+                              return;
+                            }
+
+                            try {
+                              final updated = task.copyWith(
+                                title: title,
+                                urgent: urgent ?? false,
+                                important: important ?? false,
+                                context: selectedContext,
+                                dueDate: dueDate,
+                                subMissionId: selectedSubMissionId,
+                                isInbox: false,
+                              );
+                              await _taskService.updateTask(updated);
+                              if (!mounted) return;
+                              await _loadInboxTasks();
+                              setState(() {});
+                              Navigator.pop(context);
+                            } catch (e) {
+                              setModalState(() {
+                                errorText = "Failed to update task: $e";
+                              });
+                            }
+                          },
+                          child: const Text("Save Task"),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _markAllRead() async {
@@ -256,71 +805,84 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _buildSwipeNotification({
+    Key? key,
     required String title,
     required String message,
     required String time,
     IconData icon = Icons.check,
     Color iconColor = const Color(AppColors.textMuted),
     bool done = false,
+    VoidCallback? onTap,
+    DismissDirection dismissDirection = DismissDirection.horizontal,
+    DismissDirectionCallback? onDismissed,
   }) {
     return Dismissible(
-      key: UniqueKey(),
+      key: key ?? UniqueKey(),
+      direction: dismissDirection,
+      onDismissed: onDismissed,
       background: _buildSwipeBackground(),
       secondaryBackground: _buildSwipeDelete(),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: cardColor,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            _buildIcon(icon, iconColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Opacity(
-                opacity: done ? 0.5 : 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                _buildIcon(icon, iconColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Opacity(
+                    opacity: done ? 0.5 : 1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              color: const Color(AppColors.textMain),
-                              fontSize: 15,
-                              decoration: done
-                                  ? TextDecoration.lineThrough
-                                  : null,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: TextStyle(
+                                  color: const Color(AppColors.textMain),
+                                  fontSize: 15,
+                                  decoration: done
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
                             ),
-                          ),
+                            Text(
+                              time,
+                              style: const TextStyle(
+                                color: Color(AppColors.textMuted),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 6),
                         Text(
-                          time,
+                          message,
                           style: const TextStyle(
                             color: Color(AppColors.textMuted),
-                            fontSize: 12,
+                            fontSize: 13,
+                            height: 1.3,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      message,
-                      style: const TextStyle(
-                        color: Color(AppColors.textMuted),
-                        fontSize: 13,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -359,50 +921,43 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _buildNotificationsList() {
+    final unreadItems = items.where((item) => !item.read).toList();
+    if (unreadItems.isEmpty) {
+      return const Center(
+        child: Text(
+          "No notifications yet.",
+          style: TextStyle(color: Color(AppColors.textMuted)),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView(
+      child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        children: [
-          _buildSectionTitle("NEW"),
-          _buildNotificationCardNew(
-            icon: Icons.check_circle,
-            iconColor: green,
-            title: "Due Today: Complete draft for Project Proposal",
-            message:
-                "The initial draft is due by 5:00 PM. Don't forget to include the budget analysis section.",
-            time: "2m ago",
-          ),
-          _buildNotificationCardNew(
-            icon: Icons.flag,
-            iconColor: const Color(AppColors.accentPurple),
-            title: "Quarterly Mission Statement Review",
-            message: "Your scheduled review starts in 10 minutes.",
-            time: "1h ago",
-            actionButton: _buildSmallActionButton("Start Review"),
-          ),
-          const SizedBox(height: 20),
-          _buildSectionTitle("EARLIER"),
-          _buildSwipeNotification(
-            title: "Alignment Tip",
-            message:
-                "You recently linked a task to your 'Health' mission. Try adding a workout or meditation...",
-            time: "Yesterday",
-          ),
-          _buildSwipeNotification(
-            title: "Buy Groceries",
-            message: "Marked as done from your daily list.",
-            time: "Yesterday",
-            done: true,
-          ),
-          _buildSwipeNotification(
-            title: "Weekly Retrospective",
-            message: "Ready to look back at your week?",
-            time: "2 days ago",
-            icon: Icons.assignment_turned_in,
-            iconColor: const Color(AppColors.secondaryIndigoLight),
-          ),
-        ],
+        itemCount: unreadItems.length,
+        itemBuilder: (context, index) {
+          final item = unreadItems[index];
+          return _buildSwipeNotification(
+            key: ValueKey("notification_${item.id}"),
+            title: item.title,
+            message: item.message,
+            time: item.time,
+            icon: item.read ? Icons.notifications : Icons.notifications_active,
+            iconColor: item.read ? const Color(AppColors.textMuted) : green,
+            done: item.read,
+            dismissDirection: DismissDirection.none,
+            onTap: () async {
+              await service.markRead(item.id);
+              await _loadData();
+              if (!mounted) return;
+              if (item.id.startsWith("weekly_insights_")) {
+                mainNavIndex.value = 3;
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            },
+          );
+        },
       ),
     );
   }
@@ -427,11 +982,31 @@ class _NotificationsPageState extends State<NotificationsPage>
           final missionLine =
               task.mission == null ? "Inbox" : "Mission: ${task.mission}";
           return _buildSwipeNotification(
+            key: ValueKey("inbox_${task.id}"),
             title: task.title,
             message: missionLine,
             time: "Recently",
             icon: Icons.inbox,
             iconColor: green,
+            onTap: () => _openQuickTaskAssignmentSheet(task),
+            dismissDirection: DismissDirection.endToStart,
+            onDismissed: (_) async {
+              final removedTask = task;
+              setState(() {
+                inboxTasks.removeAt(index);
+              });
+              try {
+                await _taskService.deleteTask(removedTask.id);
+              } catch (e) {
+                if (!mounted) return;
+                setState(() {
+                  inboxTasks.insert(index, removedTask);
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Failed to delete task: $e")),
+                );
+              }
+            },
           );
         },
       ),

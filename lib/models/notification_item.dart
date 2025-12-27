@@ -27,7 +27,7 @@ class NotificationItem {
       title: json["title"],
       message: json["message"],
       time: json["time"],
-      read: json["read"],
+      read: json["read"] == true,
     );
   }
 }
