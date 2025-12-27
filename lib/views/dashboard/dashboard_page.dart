@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 //import 'package:speech_to_text/speech_to_text.dart';
 import 'package:sptm/core/constants.dart';
+import 'package:sptm/models/context_tag.dart';
 import 'package:sptm/models/mission.dart';
 import 'package:sptm/models/task_item.dart';
+import 'package:sptm/services/context_service.dart';
 import 'package:sptm/services/mission_service.dart';
 import 'package:sptm/services/task_service.dart';
 import 'package:sptm/views/dashboard/widgets/task_card.dart';
@@ -33,7 +35,7 @@ class _DashboardPageState extends State<DashboardPage>
   late final Animation<double> _listeningPulse;
   bool _isListening = false;
   bool _isQuickCaptureOpen = false;
-  final List<String> _contexts = ["@home", "@work", "@waiting"];
+  final List<ContextTag> _contexts = [];
   final Map<String, String?> _contextFilters = {
     "urgent_important": null,
     "urgent_not_important": null,
@@ -48,6 +50,7 @@ class _DashboardPageState extends State<DashboardPage>
     super.initState();
     _loadUserInfo();
     _loadTasks();
+    _loadContexts();
     _loadSubMissions();
     _listeningPulseController = AnimationController(
       vsync: this,
@@ -79,6 +82,7 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   final TaskService _taskService = TaskService();
+  final ContextService _contextService = ContextService();
   final MissionService _missionService = MissionService();
 
   Future<void> _loadUserInfo() async {
@@ -145,6 +149,27 @@ class _DashboardPageState extends State<DashboardPage>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to load sub-missions: $e")),
       );
+    }
+  }
+
+  Future<void> _loadContexts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) return;
+
+    try {
+      final contexts = await _contextService.fetchUserContexts(userId);
+      if (!mounted) return;
+      setState(() {
+        _contexts
+          ..clear()
+          ..addAll(contexts);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load contexts: $e")));
     }
   }
 
@@ -469,16 +494,18 @@ class _DashboardPageState extends State<DashboardPage>
                 },
               ),
               ..._contexts.map(
-                (contextValue) => ListTile(
+                (contextTag) => ListTile(
                   title: Text(
-                    contextValue,
+                    contextTag.name,
                     style: const TextStyle(color: Color(AppColors.textMain)),
                   ),
-                  trailing: selected == contextValue
+                  trailing: selected == contextTag.name
                       ? const Icon(Icons.check, color: Color(AppColors.primary))
                       : null,
                   onTap: () {
-                    setState(() => _contextFilters[filterKey] = contextValue);
+                    setState(
+                      () => _contextFilters[filterKey] = contextTag.name,
+                    );
                     Navigator.pop(context);
                   },
                 ),
@@ -492,6 +519,7 @@ class _DashboardPageState extends State<DashboardPage>
 
   Future<void> _openAddTaskSheet() async {
     await _loadSubMissions();
+    await _loadContexts();
     final titleController = TextEditingController();
     final dueDateController = TextEditingController();
     bool? urgent;
@@ -732,9 +760,9 @@ class _DashboardPageState extends State<DashboardPage>
                         ),
                         items: [
                           ..._contexts.map(
-                            (contextValue) => DropdownMenuItem(
-                              value: contextValue,
-                              child: Text(contextValue),
+                            (contextTag) => DropdownMenuItem(
+                              value: contextTag.name,
+                              child: Text(contextTag.name),
                             ),
                           ),
                           const DropdownMenuItem(
@@ -800,8 +828,43 @@ class _DashboardPageState extends State<DashboardPage>
                             final newContext = rawContext.startsWith("@")
                                 ? rawContext
                                 : "@$rawContext";
-                            if (!_contexts.contains(newContext)) {
-                              setState(() => _contexts.add(newContext));
+                            final alreadyExists = _contexts.any(
+                              (contextTag) => contextTag.name == newContext,
+                            );
+                            if (!alreadyExists) {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              final userId = prefs.getInt("userId");
+                              if (userId == null) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      "Missing user info for context creation.",
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              try {
+                                final created = await _contextService
+                                    .createContext(
+                                      userId: userId,
+                                      name: newContext,
+                                    );
+                                if (!mounted) return;
+                                setState(() => _contexts.add(created));
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Failed to create context: $e",
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                             }
                             setModalState(() {
                               selectedContext = newContext;

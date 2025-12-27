@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sptm/core/constants.dart';
 import 'package:sptm/models/weekly_stats.dart';
 import 'package:sptm/models/task_item.dart';
 import 'package:sptm/services/analytics_service.dart';
@@ -20,13 +21,13 @@ class _InsightsPageState extends State<InsightsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E1117),
+      backgroundColor: const Color(AppColors.background),
       appBar: const SPTMAppBar(title: "Insights"),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadStats,
-          color: const Color(0xFF6C5CE7),
-          backgroundColor: const Color(0xFF161B22),
+          color: const Color(AppColors.primary),
+          backgroundColor: const Color(AppColors.surface),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
@@ -190,7 +191,7 @@ class _InsightsPageState extends State<InsightsPage> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
+          color: const Color(AppColors.surface),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -253,7 +254,7 @@ class _InsightsPageState extends State<InsightsPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: const Color(AppColors.surface),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
