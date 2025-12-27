@@ -1,9 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sptm/core/constants.dart';
+import 'package:sptm/models/task_item.dart';
 import 'package:sptm/services/notification_service.dart';
+import 'package:sptm/services/task_service.dart';
 
 // TODO if there are quick-add tasks not assigned, show a notification about that
 
@@ -18,14 +18,14 @@ class NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<NotificationsPage>
     with SingleTickerProviderStateMixin {
-  static const String _inboxKey = "quick_capture_inbox_tasks";
   final Color bg = const Color(AppColors.background);
   final Color cardColor = const Color(AppColors.surface);
   final Color green = const Color(AppColors.primary);
   late TabController tabController;
   late NotificationService service;
+  final TaskService _taskService = TaskService();
   List<NotificationItem> items = [];
-  List<_InboxTask> inboxTasks = [];
+  List<TaskItem> inboxTasks = [];
 
   @override
   void initState() {
@@ -72,19 +72,24 @@ class _NotificationsPageState extends State<NotificationsPage>
 
   Future<void> _loadInboxTasks() async {
     final prefs = await SharedPreferences.getInstance();
-    final rawItems = prefs.getStringList(_inboxKey) ?? [];
-    inboxTasks = rawItems
-        .map((raw) {
-          try {
-            return _InboxTask.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<_InboxTask>()
-        .toList()
-        .reversed
-        .toList();
+    final userId = prefs.getInt("userId");
+    if (userId == null) {
+      inboxTasks = [];
+      return;
+    }
+
+    try {
+      final tasks = await _taskService.getTasks(userId);
+      inboxTasks = tasks
+          .where((task) => task.isInbox && !task.isArchived)
+          .toList()
+        ..sort((a, b) => b.id.compareTo(a.id));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to load inbox tasks: $e")),
+      );
+    }
   }
 
   Future<void> _markAllRead() async {
@@ -419,9 +424,8 @@ class _NotificationsPageState extends State<NotificationsPage>
         itemCount: inboxTasks.length,
         itemBuilder: (context, index) {
           final task = inboxTasks[index];
-          final missionLine = task.mission == null
-              ? "Inbox"
-              : "Mission: ${task.mission}";
+          final missionLine =
+              task.mission == null ? "Inbox" : "Mission: ${task.mission}";
           return _buildSwipeNotification(
             title: task.title,
             message: missionLine,
@@ -459,28 +463,6 @@ class _NotificationsPageState extends State<NotificationsPage>
           ],
         ),
       ),
-    );
-  }
-}
-
-class _InboxTask {
-  final String title;
-  final String? mission;
-  final DateTime createdAt;
-
-  const _InboxTask({
-    required this.title,
-    required this.createdAt,
-    this.mission,
-  });
-
-  factory _InboxTask.fromJson(Map<String, dynamic> json) {
-    return _InboxTask(
-      title: (json["title"] as String?) ?? "Untitled",
-      mission: json["mission"] as String?,
-      createdAt:
-          DateTime.tryParse(json["createdAt"] as String? ?? "") ??
-          DateTime.now(),
     );
   }
 }

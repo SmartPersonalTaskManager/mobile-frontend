@@ -23,8 +23,6 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage>
     with SingleTickerProviderStateMixin {
-  static const String _inboxKey = "quick_capture_inbox_tasks";
-  static const String _tasksKey = "dashboard_tasks";
   String todaysDate = "";
   String firstName = "";
   String? profileImagePath;
