@@ -4,6 +4,7 @@ import 'package:sptm/core/constants.dart';
 class TaskCard extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String? submission;
   final bool done;
   final VoidCallback? onToggleDone;
 
@@ -11,9 +12,15 @@ class TaskCard extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
+    this.submission,
     this.done = false,
     this.onToggleDone,
   });
+
+  bool get _hasSubmission {
+    final value = submission;
+    return value != null && value.trim().isNotEmpty;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +74,16 @@ class TaskCard extends StatelessWidget {
                         : const Color(AppColors.textMain),
                   ),
                 ),
+                if (_hasSubmission) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    submission!.trim(),
+                    style: const TextStyle(
+                      color: Color(AppColors.textMuted),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(
                   subtitle,

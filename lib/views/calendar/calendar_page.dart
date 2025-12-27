@@ -364,8 +364,9 @@ class _CalendarPageState extends State<CalendarPage> {
                             final task = dueTasks[index];
                             return TaskCard(
                               title: task.title,
+                              submission: task.mission,
                               subtitle:
-                                  "${task.mission} · ${task.context} · ${_urgencyLabel(task)}",
+                                  "${task.context ?? "No context"} · ${_urgencyLabel(task)}",
                               done: task.done,
                               onToggleDone: () => _toggleTaskDone(task),
                             );

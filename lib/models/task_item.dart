@@ -27,6 +27,33 @@ class TaskItem {
     this.done = false,
   });
 
+  static String? _parseMissionName(Map<String, dynamic> json) {
+    const keys = [
+      'missionName',
+      'mission',
+      'subMissionTitle',
+      'subMissionName',
+      'submissionTitle',
+      'submission',
+      'subMission',
+    ];
+
+    for (final key in keys) {
+      final value = json[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value;
+      }
+      if (value is Map<String, dynamic>) {
+        final nestedTitle = value['title'];
+        if (nestedTitle is String && nestedTitle.trim().isNotEmpty) {
+          return nestedTitle;
+        }
+      }
+    }
+
+    return null;
+  }
+
   factory TaskItem.fromJson(Map<String, dynamic> json) {
     // Priority logic
     final priority = json['priority'] as String?;
@@ -55,7 +82,7 @@ class TaskItem {
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'])
           : null,
-      mission: json['missionName'],
+      mission: _parseMissionName(json),
       done: isDone,
     );
   }
@@ -102,7 +129,7 @@ class TaskItem {
       priorityVal = "NOT_URGENT_NOT_IMPORTANT";
     }
 
-    return {
+    final payload = {
       'id': id,
       'title': title,
       'description': description,
@@ -114,5 +141,11 @@ class TaskItem {
       'isArchived': isArchived,
       'completedAt': completedAt?.toIso8601String(),
     };
+
+    if (mission != null && mission!.trim().isNotEmpty) {
+      payload['missionName'] = mission!.trim();
+    }
+
+    return payload;
   }
 }

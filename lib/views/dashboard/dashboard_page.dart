@@ -436,9 +436,12 @@ class _DashboardPageState extends State<DashboardPage>
         userId: userId,
         mission: mission,
       );
+      final resolvedTask = (mission == null || mission.trim().isEmpty)
+          ? newTask
+          : newTask.copyWith(mission: mission);
       if (!mounted) return;
       setState(() {
-        _tasks.insert(0, newTask);
+        _tasks.insert(0, resolvedTask);
       });
     } catch (e) {
       if (!mounted) return;
@@ -968,6 +971,13 @@ class _DashboardPageState extends State<DashboardPage>
                                 urgent: urgent ?? false,
                                 important: important ?? false,
                               );
+                              final resolvedTask =
+                                  (selectedMission == null ||
+                                          selectedMission!.trim().isEmpty)
+                                      ? newTask
+                                      : newTask.copyWith(
+                                          mission: selectedMission,
+                                        );
 
                               // Update locally if needed, or reload
                               setState(() {
@@ -978,7 +988,7 @@ class _DashboardPageState extends State<DashboardPage>
                                 // But wait, the previous code was inserting a full object.
 
                                 // Let's rely on reload for proper ID or simple insert
-                                _tasks.insert(0, newTask);
+                                _tasks.insert(0, resolvedTask);
                               });
                             } catch (e) {
                               // Error handling
@@ -1254,8 +1264,9 @@ class _DashboardPageState extends State<DashboardPage>
                         },
                         child: TaskCard(
                           title: task.title,
+                          submission: task.mission,
                           subtitle:
-                              "${task.mission ?? "No mission"} · ${task.context ?? "No context"} · ${task.dueDate != null ? _formatDate(task.dueDate!) : "No date"}",
+                              "${task.context ?? "No context"} · ${task.dueDate != null ? _formatDate(task.dueDate!) : "No date"}",
                           done: task.done,
                           onToggleDone: () => _toggleTaskDone(task),
                         ),
