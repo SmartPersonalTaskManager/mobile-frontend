@@ -8,6 +8,9 @@ class MissionServiceException implements Exception {
   final String message;
 
   const MissionServiceException(this.message);
+
+  @override
+  String toString() => message;
 }
 
 class MissionService {
@@ -84,8 +87,13 @@ class MissionService {
     final response = await _apiService.delete(
       '/missions/submissions/$subMissionId',
     );
-    if (response.statusCode == 204) {
+    if (response.statusCode == 200 || response.statusCode == 204) {
       return;
+    }
+    if (response.statusCode == 403) {
+      throw const MissionServiceException(
+        'Cannot delete a sub-mission with linked tasks.',
+      );
     }
 
     throw MissionServiceException(_errorMessage(response));

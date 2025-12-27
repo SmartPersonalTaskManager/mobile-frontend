@@ -289,8 +289,8 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ListTile(
-                    onTap: () {
-                      Navigator.of(context).push(
+                    onTap: () async {
+                      final deletedId = await Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => SubMissionDetailPage(
                             subMissionTitle: submission.title,
@@ -298,6 +298,10 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                           ),
                         ),
                       );
+                      if (!mounted || deletedId is! int) return;
+                      setState(() {
+                        _subMissions.removeWhere((item) => item.id == deletedId);
+                      });
                     },
                     title: Text(
                       submission.title,
@@ -343,7 +347,9 @@ class SubMissionDetailPage extends StatefulWidget {
 class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
   final List<TaskItem> _tasks = [];
   final TaskService _taskService = TaskService();
+  final MissionService _missionService = MissionService();
   bool _isLoading = true;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -402,6 +408,51 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
     }
   }
 
+  Future<void> _confirmDeleteSubMission() async {
+    if (_isDeleting) return;
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(AppColors.surface),
+          title: const Text(
+            "Delete Sub-mission",
+            style: TextStyle(color: Color(AppColors.textMain)),
+          ),
+          content: const Text(
+            "Are you sure you want to delete this sub-mission?",
+            style: TextStyle(color: Color(AppColors.textMuted)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) return;
+
+    setState(() => _isDeleting = true);
+    try {
+      await _missionService.deleteSubMission(widget.subMissionId);
+      if (!mounted) return;
+      Navigator.pop(context, widget.subMissionId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDeleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete sub-mission: $e')),
+      );
+    }
+  }
+
   List<TaskItem> get _linkedTasks {
     return _tasks
         .where((task) => task.subMissionId == widget.subMissionId)
@@ -443,6 +494,13 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: _isDeleting ? null : _confirmDeleteSubMission,
+            tooltip: "Delete sub-mission",
+          ),
+        ],
       ),
       body: SafeArea(
         bottom: false,
