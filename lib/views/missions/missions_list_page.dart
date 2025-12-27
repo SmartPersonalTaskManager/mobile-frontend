@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sptm/core/constants.dart';
+import 'package:sptm/models/core_value.dart';
 import 'package:sptm/models/mission.dart';
+import 'package:sptm/services/core_value_service.dart';
 import 'package:sptm/services/mission_service.dart';
 import 'package:sptm/views/missions/mission_detail_page.dart';
 import 'package:sptm/views/widgets/app_bar.dart';
@@ -15,13 +17,18 @@ class MissionsListPage extends StatefulWidget {
 
 class _MissionsListPageState extends State<MissionsListPage> {
   final MissionService _missionService = MissionService();
+  final CoreValueService _coreValueService = CoreValueService();
   final List<Mission> _missions = [];
+  CoreValue? _coreValue;
   bool _isLoading = true;
+  bool _isLoadingValue = true;
+  bool _isSavingValue = false;
 
   @override
   void initState() {
     super.initState();
     _loadMissions();
+    _loadCoreValues();
   }
 
   Future<void> _loadMissions() async {
@@ -47,6 +54,34 @@ class _MissionsListPageState extends State<MissionsListPage> {
         context,
       ).showSnackBar(SnackBar(content: Text("Failed to load missions: $e")));
     }
+  }
+
+  Future<void> _loadCoreValues() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) {
+      if (mounted) setState(() => _isLoadingValue = false);
+      return;
+    }
+
+    try {
+      final values = await _coreValueService.fetchUserCoreValues(userId);
+      if (!mounted) return;
+      setState(() {
+        _coreValue = values.isNotEmpty ? values.first : null;
+        _isLoadingValue = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingValue = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to load core values: $e")),
+      );
+    }
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([_loadMissions(), _loadCoreValues()]);
   }
 
   Future<void> _showAddMissionDialog() async {
@@ -115,7 +150,87 @@ class _MissionsListPageState extends State<MissionsListPage> {
     }
   }
 
+  Future<void> _showEditValueDialog() async {
+    if (_isSavingValue) return;
+    final controller = TextEditingController(text: _coreValue?.text ?? '');
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(AppColors.surface),
+          title: const Text(
+            'Edit Core Value',
+            style: TextStyle(color: Color(AppColors.textMain)),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(color: Color(AppColors.textMain)),
+            decoration: const InputDecoration(
+              hintText: 'Value statement',
+              hintStyle: TextStyle(color: Color(AppColors.textMuted)),
+            ),
+            onSubmitted: (_) => Navigator.of(context).pop(controller.text),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    final text = result?.trim();
+    if (text == null || text.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a value statement.")),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User not found.")),
+      );
+      return;
+    }
+
+    setState(() => _isSavingValue = true);
+    try {
+      final updated = _coreValue == null
+          ? await _coreValueService.createCoreValue(userId: userId, text: text)
+          : await _coreValueService.updateCoreValue(
+              id: _coreValue!.id,
+              text: text,
+            );
+      if (!mounted) return;
+      setState(() {
+        _coreValue = updated;
+        _isSavingValue = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSavingValue = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to save core value: $e")),
+      );
+    }
+  }
+
   Widget _buildValueHeader() {
+    final valueText = _coreValue?.text;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
@@ -127,8 +242,8 @@ class _MissionsListPageState extends State<MissionsListPage> {
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'My Values:',
                 style: TextStyle(
                   color: Color(AppColors.textMain),
@@ -136,15 +251,35 @@ class _MissionsListPageState extends State<MissionsListPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(
-                '\"Be a good person\"',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Color(AppColors.textMain),
-                  fontStyle: FontStyle.italic,
+              if (_isLoadingValue)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(AppColors.primary),
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  valueText?.isNotEmpty == true
+                      ? '"$valueText"'
+                      : 'Enter your core values',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: Color(AppColors.textMain),
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
-              ),
             ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit, color: Color(AppColors.textMain)),
+            onPressed: _isSavingValue ? null : _showEditValueDialog,
+            tooltip: "Edit core value",
           ),
         ],
       ),
@@ -274,7 +409,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
         child: RefreshIndicator(
           color: const Color(AppColors.primary),
           backgroundColor: const Color(AppColors.background),
-          onRefresh: _loadMissions,
+          onRefresh: _refreshAll,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Padding(
