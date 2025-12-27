@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sptm/core/constants.dart';
-import 'package:sptm/models/mission.dart';
 import 'package:sptm/models/task_item.dart';
-import 'package:sptm/services/mission_service.dart';
 import 'package:sptm/services/task_service.dart';
 
 class TaskDetailsPage extends StatefulWidget {
@@ -46,14 +43,10 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
   final TextEditingController _dueDateController = TextEditingController();
   final List<_ChecklistItem> _checklist = [];
   final TaskService _taskService = TaskService();
-  final MissionService _missionService = MissionService();
-  final List<String> _subMissionTitles = [];
   late TaskItem _task;
   DateTime? _dueDate;
   bool _isEditing = false;
   bool _isSaving = false;
-  bool _isLoadingSubMissions = true;
-  String? _selectedMission;
 
   @override
   void initState() {
@@ -64,8 +57,6 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
     _contextController.text = _task.context ?? '';
     _dueDate = _task.dueDate;
     _dueDateController.text = _dueDate != null ? _formatDate(_dueDate!) : '';
-    _selectedMission = _task.mission?.trim();
-    _loadSubMissions();
   }
 
   @override
@@ -120,39 +111,6 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
       return;
     }
     item.controller.text = value;
-  }
-
-  Future<void> _loadSubMissions() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt("userId");
-    if (userId == null) {
-      if (!mounted) return;
-      setState(() => _isLoadingSubMissions = false);
-      return;
-    }
-
-    try {
-      final missions = await _missionService.fetchUserMissions(userId);
-      if (!mounted) return;
-      final titles = <String>{};
-      for (final Mission mission in missions) {
-        for (final SubMission subMission in mission.subMissions) {
-          final title = subMission.title.trim();
-          if (title.isNotEmpty) {
-            titles.add(title);
-          }
-        }
-      }
-      setState(() {
-        _subMissionTitles
-          ..clear()
-          ..addAll(titles.toList()..sort());
-        _isLoadingSubMissions = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoadingSubMissions = false);
-    }
   }
 
   Future<void> _confirmDeleteTask() async {
@@ -256,9 +214,6 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
           ? null
           : _contextController.text.trim(),
       dueDate: _dueDate,
-      mission: _selectedMission?.trim().isEmpty == true
-          ? null
-          : _selectedMission?.trim(),
     );
 
     setState(() => _isSaving = true);
@@ -274,7 +229,6 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
         _dueDateController.text = saved.dueDate != null
             ? _formatDate(saved.dueDate!)
             : '';
-        _selectedMission = saved.mission?.trim();
         _isEditing = false;
         _isSaving = false;
       });
@@ -286,24 +240,6 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
     }
-  }
-
-  List<DropdownMenuItem<String>> _buildSubMissionItems() {
-    final titles = <String>{..._subMissionTitles};
-    final selected = _selectedMission?.trim();
-    if (selected != null && selected.isNotEmpty) {
-      titles.add(selected);
-    }
-    final sorted = titles.toList()..sort();
-    return [
-      const DropdownMenuItem<String>(
-        value: "__none__",
-        child: Text("No submission"),
-      ),
-      ...sorted.map(
-        (title) => DropdownMenuItem<String>(value: title, child: Text(title)),
-      ),
-    ];
   }
 
   Widget _actionIconButton({
@@ -423,45 +359,6 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                       ),
                       const SizedBox(height: 4),
                       if (_isEditing) ...[
-                        DropdownButtonFormField<String>(
-                          value: _selectedMission ?? "__none__",
-                          items: _buildSubMissionItems(),
-                          onChanged: _isLoadingSubMissions
-                              ? null
-                              : (value) {
-                                  setState(() {
-                                    if (value == "__none__") {
-                                      _selectedMission = null;
-                                    } else {
-                                      _selectedMission = value;
-                                    }
-                                  });
-                                },
-                          dropdownColor: const Color(AppColors.surface),
-                          iconEnabledColor: const Color(AppColors.textMuted),
-                          style: const TextStyle(
-                            color: Color(AppColors.textMain),
-                          ),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(AppColors.surfaceBase),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        if (_isLoadingSubMissions) ...[
-                          const SizedBox(height: 6),
-                          const Text(
-                            "Loading submissions...",
-                            style: TextStyle(
-                              color: Color(AppColors.textMuted),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
                         TextField(
                           controller: _dueDateController,
                           readOnly: true,

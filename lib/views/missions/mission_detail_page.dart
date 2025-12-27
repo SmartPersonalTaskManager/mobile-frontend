@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sptm/core/constants.dart';
 import 'package:sptm/models/mission.dart';
 import 'package:sptm/models/task_item.dart';
 import 'package:sptm/services/mission_service.dart';
+import 'package:sptm/services/task_service.dart';
 import 'package:sptm/views/dashboard/widgets/task_card.dart';
 import 'package:sptm/views/tasks/task_details_page.dart';
 
@@ -14,8 +13,9 @@ import 'package:sptm/views/tasks/task_details_page.dart';
 
 class MissionDetailPage extends StatefulWidget {
   final Mission mission;
+  final VoidCallback? onDelete;
 
-  const MissionDetailPage({super.key, required this.mission});
+  const MissionDetailPage({super.key, required this.mission, this.onDelete});
 
   @override
   State<MissionDetailPage> createState() => _MissionDetailPageState();
@@ -190,6 +190,40 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
     }
   }
 
+  Future<void> _confirmDeleteMission() async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(AppColors.surface),
+          title: const Text(
+            "Delete Mission",
+            style: TextStyle(color: Color(AppColors.textMain)),
+          ),
+          content: const Text(
+            "Are you sure you want to delete this mission?",
+            style: TextStyle(color: Color(AppColors.textMuted)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      widget.onDelete?.call();
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Assuming backend SubMission has title and description.
@@ -210,6 +244,11 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: _confirmDeleteMission,
+            tooltip: "Delete mission",
+          ),
           IconButton(
             icon: const Icon(Icons.edit, color: Color(AppColors.textMain)),
             onPressed: _isUpdatingTitle ? null : _showEditMissionDialog,
@@ -255,6 +294,7 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                         MaterialPageRoute(
                           builder: (_) => SubMissionDetailPage(
                             subMissionTitle: submission.title,
+                            subMissionId: submission.id,
                           ),
                         ),
                       );
@@ -288,16 +328,21 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
 
 class SubMissionDetailPage extends StatefulWidget {
   final String subMissionTitle;
+  final int subMissionId;
 
-  const SubMissionDetailPage({super.key, required this.subMissionTitle});
+  const SubMissionDetailPage({
+    super.key,
+    required this.subMissionTitle,
+    required this.subMissionId,
+  });
 
   @override
   State<SubMissionDetailPage> createState() => _SubMissionDetailPageState();
 }
 
 class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
-  static const String _tasksKey = "dashboard_tasks";
   final List<TaskItem> _tasks = [];
+  final TaskService _taskService = TaskService();
   bool _isLoading = true;
 
   @override
@@ -308,27 +353,26 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
 
   Future<void> _loadTasks() async {
     final prefs = await SharedPreferences.getInstance();
-    final rawItems = prefs.getStringList(_tasksKey) ?? [];
-    final loadedTasks = <TaskItem>[];
-    for (final raw in rawItems) {
-      try {
-        final decoded = jsonDecode(raw) as Map<String, dynamic>;
-        loadedTasks.add(TaskItem.fromJson(decoded));
-      } catch (_) {}
+    final userId = prefs.getInt("userId");
+    if (userId == null) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      return;
     }
-    if (!mounted) return;
-    setState(() {
-      _tasks
-        ..clear()
-        ..addAll(loadedTasks);
-      _isLoading = false;
-    });
-  }
 
-  Future<void> _saveTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final payloads = _tasks.map((task) => jsonEncode(task.toJson())).toList();
-    await prefs.setStringList(_tasksKey, payloads);
+    try {
+      final loadedTasks = await _taskService.getTasks(userId);
+      if (!mounted) return;
+      setState(() {
+        _tasks
+          ..clear()
+          ..addAll(loadedTasks);
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _toggleTaskDone(TaskItem task) async {
@@ -343,12 +387,24 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
     setState(() {
       _tasks[index] = updated;
     });
-    await _saveTasks();
+
+    try {
+      final saved = await _taskService.toggleTaskDone(task);
+      if (!mounted) return;
+      setState(() {
+        _tasks[index] = saved;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _tasks[index] = task;
+      });
+    }
   }
 
   List<TaskItem> get _linkedTasks {
     return _tasks
-        .where((task) => task.mission == widget.subMissionTitle)
+        .where((task) => task.subMissionId == widget.subMissionId)
         .toList();
   }
 
@@ -465,33 +521,43 @@ class _SubMissionDetailPageState extends State<SubMissionDetailPage> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(14),
-                            onTap: () {
-                              Navigator.of(context).push(
+                            onTap: () async {
+                              await Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (context) => TaskDetailsPage(
                                     task: task,
-                                    onDelete: () {
-                                      setState(() {
-                                        _tasks.remove(task);
-                                      });
-                                      _saveTasks();
+                                    onDelete: () async {
+                                      await _taskService.deleteTask(task.id);
+                                      _loadTasks();
                                     },
-                                    onUpdate: (updated) {
-                                      final index = _tasks.indexWhere(
-                                        (t) => t.id == updated.id,
-                                      );
-                                      if (index == -1) return;
+                                    onUpdate: (updated) async {
+                                      await _taskService.updateTask(updated);
+                                      if (!mounted) return;
                                       setState(() {
-                                        _tasks[index] = updated;
+                                        final index = _tasks.indexWhere(
+                                          (t) => t.id == updated.id,
+                                        );
+                                        if (updated.subMissionId ==
+                                            widget.subMissionId) {
+                                          if (index == -1) {
+                                            _tasks.add(updated);
+                                          } else {
+                                            _tasks[index] = updated;
+                                          }
+                                        } else if (index != -1) {
+                                          _tasks.removeAt(index);
+                                        }
                                       });
-                                      _saveTasks();
                                     },
                                   ),
                                 ),
                               );
+                              if (!mounted) return;
+                              _loadTasks();
                             },
                             child: TaskCard(
                               title: task.title,
+                              submission: widget.subMissionTitle,
                               subtitle:
                                   "${task.context ?? "No context"} · ${task.dueDate != null ? _formatDate(task.dueDate!) : "No date"}",
                               done: task.done,

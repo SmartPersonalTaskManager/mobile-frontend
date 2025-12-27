@@ -10,6 +10,7 @@ class TaskItem {
   final bool isArchived;
   final DateTime? completedAt;
   final String? mission; // For UI display, might not be in basic DTO yet
+  final int? subMissionId;
   final bool done; // Helper for UI, derived from status or completedAt
 
   TaskItem({
@@ -24,6 +25,7 @@ class TaskItem {
     this.isArchived = false,
     this.completedAt,
     this.mission,
+    this.subMissionId,
     this.done = false,
   });
 
@@ -55,6 +57,12 @@ class TaskItem {
   }
 
   factory TaskItem.fromJson(Map<String, dynamic> json) {
+    final subMissionField = json['subMission'];
+    final subMissionId =
+        (json['subMissionId'] as num?)?.toInt() ??
+        (subMissionField is Map<String, dynamic>
+            ? (subMissionField['id'] as num?)?.toInt()
+            : null);
     // Priority logic
     final priority = json['priority'] as String?;
     final u = priority?.contains("URGENT") ?? false;
@@ -83,6 +91,7 @@ class TaskItem {
           ? DateTime.parse(json['completedAt'])
           : null,
       mission: _parseMissionName(json),
+      subMissionId: subMissionId,
       done: isDone,
     );
   }
@@ -99,6 +108,7 @@ class TaskItem {
     bool? isArchived,
     DateTime? completedAt,
     String? mission,
+    int? subMissionId,
     bool? done,
   }) {
     return TaskItem(
@@ -113,6 +123,7 @@ class TaskItem {
       isArchived: isArchived ?? this.isArchived,
       completedAt: completedAt ?? this.completedAt,
       mission: mission ?? this.mission,
+      subMissionId: subMissionId ?? this.subMissionId,
       done: done ?? this.done,
     );
   }
@@ -142,8 +153,8 @@ class TaskItem {
       'completedAt': completedAt?.toIso8601String(),
     };
 
-    if (mission != null && mission!.trim().isNotEmpty) {
-      payload['missionName'] = mission!.trim();
+    if (subMissionId != null) {
+      payload['subMissionId'] = subMissionId;
     }
 
     return payload;

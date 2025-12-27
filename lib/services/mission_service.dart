@@ -91,6 +91,18 @@ class MissionService {
     throw MissionServiceException(_errorMessage(response));
   }
 
+  Future<void> updateSubMission(int subMissionId, String title) async {
+    final response = await _apiService.put(
+      '/missions/submissions/$subMissionId',
+      body: title,
+    );
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    throw MissionServiceException(_errorMessage(response));
+  }
+
   String _errorMessage(http.Response response) {
     if (response.body.isEmpty) {
       return 'Request failed. (${response.statusCode})';

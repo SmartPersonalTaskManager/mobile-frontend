@@ -43,7 +43,7 @@ class _DashboardPageState extends State<DashboardPage>
     "not_urgent_not_important": null,
   };
   final List<TaskItem> _tasks = [];
-  final List<String> _subMissionTitles = [];
+  final List<SubMission> _subMissions = [];
 
   @override
   void initState() {
@@ -130,19 +130,18 @@ class _DashboardPageState extends State<DashboardPage>
     try {
       final missions = await _missionService.fetchUserMissions(userId);
       if (!mounted) return;
-      final titles = <String>{};
+      final loaded = <SubMission>[];
       for (final Mission mission in missions) {
         for (final SubMission subMission in mission.subMissions) {
-          final title = subMission.title.trim();
-          if (title.isNotEmpty) {
-            titles.add(title);
+          if (subMission.title.trim().isNotEmpty) {
+            loaded.add(subMission);
           }
         }
       }
       setState(() {
-        _subMissionTitles
+        _subMissions
           ..clear()
-          ..addAll(titles.toList()..sort());
+          ..addAll(loaded..sort((a, b) => a.title.compareTo(b.title)));
       });
     } catch (e) {
       if (!mounted) return;
@@ -173,22 +172,35 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
-  bool get _hasSubMissions => _subMissionTitles.isNotEmpty;
+  bool get _hasSubMissions => _subMissions.isNotEmpty;
 
-  List<DropdownMenuItem<String>> _buildSubMissionItems() {
-    if (_subMissionTitles.isEmpty) {
+  List<DropdownMenuItem<int>> _buildSubMissionItems() {
+    if (_subMissions.isEmpty) {
       return const [
-        DropdownMenuItem<String>(
-          value: "__none__",
+        DropdownMenuItem<int>(
+          value: -1,
           child: Text("No sub-missions available"),
         ),
       ];
     }
-    return _subMissionTitles
+    return _subMissions
         .map(
-          (title) => DropdownMenuItem<String>(value: title, child: Text(title)),
+          (subMission) => DropdownMenuItem<int>(
+            value: subMission.id,
+            child: Text(subMission.title),
+          ),
         )
         .toList();
+  }
+
+  String? _subMissionTitleForId(int? subMissionId) {
+    if (subMissionId == null) return null;
+    for (final subMission in _subMissions) {
+      if (subMission.id == subMissionId) {
+        return subMission.title;
+      }
+    }
+    return null;
   }
 
   Future<void> _toggleTaskDone(TaskItem task) async {
@@ -224,7 +236,7 @@ class _DashboardPageState extends State<DashboardPage>
   Future<void> _openQuickCaptureSheet() async {
     _quickTaskController.clear();
     await _loadSubMissions();
-    String? selectedMission;
+    int? selectedSubMissionId;
     _isQuickCaptureOpen = true;
     await showModalBottomSheet<void>(
       context: context,
@@ -336,8 +348,8 @@ class _DashboardPageState extends State<DashboardPage>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedMission,
+                  DropdownButtonFormField<int>(
+                    value: selectedSubMissionId,
                     hint: Text(
                       _hasSubMissions
                           ? "Optional sub-mission"
@@ -351,7 +363,8 @@ class _DashboardPageState extends State<DashboardPage>
                     onChanged: _hasSubMissions
                         ? (value) {
                             setModalState(() {
-                              selectedMission = value;
+                              selectedSubMissionId =
+                                  value == null || value == -1 ? null : value;
                             });
                           }
                         : null,
@@ -387,7 +400,7 @@ class _DashboardPageState extends State<DashboardPage>
                         }
                         await _saveQuickCaptureTask(
                           _quickTaskController.text.trim(),
-                          selectedMission,
+                          selectedSubMissionId,
                         );
                         if (_isListening) {
                           //await _speech.stop();
@@ -419,7 +432,10 @@ class _DashboardPageState extends State<DashboardPage>
     _isQuickCaptureOpen = false;
   }
 
-  Future<void> _saveQuickCaptureTask(String title, String? mission) async {
+  Future<void> _saveQuickCaptureTask(
+    String title,
+    int? subMissionId,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt("userId");
     if (userId == null) {
@@ -434,11 +450,11 @@ class _DashboardPageState extends State<DashboardPage>
       final newTask = await _taskService.createTask(
         title: title,
         userId: userId,
-        mission: mission,
+        subMissionId: subMissionId,
       );
-      final resolvedTask = (mission == null || mission.trim().isEmpty)
+      final resolvedTask = subMissionId == null
           ? newTask
-          : newTask.copyWith(mission: mission);
+          : newTask.copyWith(subMissionId: subMissionId);
       if (!mounted) return;
       setState(() {
         _tasks.insert(0, resolvedTask);
@@ -527,7 +543,7 @@ class _DashboardPageState extends State<DashboardPage>
     final dueDateController = TextEditingController();
     bool? urgent;
     bool? important;
-    String? selectedMission;
+    int? selectedSubMissionId;
     String? selectedContext;
     DateTime? dueDate;
     String? errorText;
@@ -716,8 +732,8 @@ class _DashboardPageState extends State<DashboardPage>
                         ),
                       ),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: selectedMission,
+                      DropdownButtonFormField<int>(
+                        value: selectedSubMissionId,
                         hint: Text(
                           _hasSubMissions
                               ? "Linked sub-mission"
@@ -735,7 +751,10 @@ class _DashboardPageState extends State<DashboardPage>
                         onChanged: _hasSubMissions
                             ? (value) {
                                 setModalState(() {
-                                  selectedMission = value;
+                                  selectedSubMissionId =
+                                      value == null || value == -1
+                                          ? null
+                                          : value;
                                   errorText = null;
                                 });
                               }
@@ -943,7 +962,8 @@ class _DashboardPageState extends State<DashboardPage>
                               });
                               return;
                             }
-                            if (_hasSubMissions && selectedMission == null) {
+                            if (_hasSubMissions &&
+                                selectedSubMissionId == null) {
                               setModalState(() {
                                 errorText = "Please select a sub-mission.";
                               });
@@ -965,19 +985,17 @@ class _DashboardPageState extends State<DashboardPage>
                               final newTask = await _taskService.createTask(
                                 title: title,
                                 userId: userId,
-                                mission: selectedMission,
+                                subMissionId: selectedSubMissionId,
                                 context: selectedContext,
                                 dueDate: dueDate,
                                 urgent: urgent ?? false,
                                 important: important ?? false,
                               );
-                              final resolvedTask =
-                                  (selectedMission == null ||
-                                          selectedMission!.trim().isEmpty)
-                                      ? newTask
-                                      : newTask.copyWith(
-                                          mission: selectedMission,
-                                        );
+                              final resolvedTask = selectedSubMissionId == null
+                                  ? newTask
+                                  : newTask.copyWith(
+                                      subMissionId: selectedSubMissionId,
+                                    );
 
                               // Update locally if needed, or reload
                               setState(() {
@@ -1231,6 +1249,9 @@ class _DashboardPageState extends State<DashboardPage>
                         const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final task = tasks[index];
+                      final submissionTitle =
+                          _subMissionTitleForId(task.subMissionId) ??
+                          task.mission;
                       return InkWell(
                         borderRadius: BorderRadius.circular(14),
                         onTap: () {
@@ -1264,7 +1285,7 @@ class _DashboardPageState extends State<DashboardPage>
                         },
                         child: TaskCard(
                           title: task.title,
-                          submission: task.mission,
+                          submission: submissionTitle,
                           subtitle:
                               "${task.context ?? "No context"} · ${task.dueDate != null ? _formatDate(task.dueDate!) : "No date"}",
                           done: task.done,

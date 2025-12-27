@@ -35,8 +35,7 @@ class TaskService {
     required String title,
     required int userId,
     String? description,
-    String?
-    mission, // This might need to be IDs in real app, assuming name or ID string for now
+    int? subMissionId,
     String? context,
     DateTime? dueDate,
     bool urgent = false,
@@ -63,12 +62,10 @@ class TaskService {
       'status': 'NOT_STARTED',
       'dueDate': dueDate?.toIso8601String(),
       'context': context,
-      // 'subMissionId': ... if we had ID
-      // For now, depending on backend DTO, if it takes mixed fields.
-      // If backend only takes subMissionId, we can't send name.
-      // Assuming backend might ignore it or we need to resolve it.
-      // We'll leave mission out of body if backend doesn't support "missionName".
     };
+    if (subMissionId != null) {
+      body['subMissionId'] = subMissionId;
+    }
 
     final response = await _api.post('/tasks', body: body, requiresAuth: true);
     if (response.statusCode == 200) {
