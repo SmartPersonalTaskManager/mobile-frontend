@@ -40,6 +40,7 @@ class TaskService {
     DateTime? dueDate,
     bool urgent = false,
     bool important = false,
+    bool isInbox = false,
   }) async {
     String priorityVal;
     if (urgent && important) {
@@ -57,7 +58,7 @@ class TaskService {
       'description': description,
       'userId': userId,
       'isArchived': false,
-      'isInbox': true,
+      'isInbox': isInbox,
       'priority': priorityVal,
       'status': 'NOT_STARTED',
       'dueDate': dueDate?.toIso8601String(),

@@ -505,6 +505,7 @@ class _DashboardPageState extends State<DashboardPage>
         title: title,
         userId: userId,
         subMissionId: subMissionId,
+        isInbox: true,
       );
       final resolvedTask = subMissionId == null
           ? newTask
@@ -1044,6 +1045,7 @@ class _DashboardPageState extends State<DashboardPage>
                                 dueDate: dueDate,
                                 urgent: urgent ?? false,
                                 important: important ?? false,
+                                isInbox: false,
                               );
                               final resolvedTask = selectedSubMissionId == null
                                   ? newTask
