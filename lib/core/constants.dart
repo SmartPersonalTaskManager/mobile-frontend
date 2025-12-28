@@ -4,7 +4,7 @@ class AppStrings {
   static const appName = "Smart Personal Task Manager";
   static String get apiBaseURL {
     if (Platform.isAndroid) {
-      return "http://10.0.2.2:8080/api";
+      return "https://sptm-backend.onrender.com/api";
     }
     return "https://sptm-backend.onrender.com/api";
   }

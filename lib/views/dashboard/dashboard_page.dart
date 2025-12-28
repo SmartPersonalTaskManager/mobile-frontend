@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-//import 'package:speech_to_text/speech_to_text.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:sptm/core/constants.dart';
 import 'package:sptm/models/context_tag.dart';
 import 'package:sptm/models/mission.dart';
@@ -28,7 +28,7 @@ class _DashboardPageState extends State<DashboardPage>
   String? profileImagePath;
   final TextEditingController _quickTaskController = TextEditingController();
   final FocusNode _quickTaskFocusNode = FocusNode();
-  //final SpeechToText _speech = SpeechToText();
+  final SpeechToText _speech = SpeechToText();
   late final AnimationController _listeningPulseController;
   late final Animation<double> _listeningPulse;
   bool _isListening = false;
@@ -231,6 +231,65 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
+  Future<void> _toggleListening(StateSetter setModalState) async {
+    if (_isListening) {
+      await _speech.stop();
+      if (!mounted) return;
+      setModalState(() => _isListening = false);
+      _listeningPulseController.stop();
+      _listeningPulseController.value = 0;
+      return;
+    }
+
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+        if (status == "notListening" || status == "done") {
+          setModalState(() => _isListening = false);
+          _listeningPulseController.stop();
+          _listeningPulseController.value = 0;
+        }
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setModalState(() => _isListening = false);
+        _listeningPulseController.stop();
+        _listeningPulseController.value = 0;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Speech error: ${error.errorMsg}")),
+        );
+      },
+    );
+
+    if (!available) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Speech recognition unavailable.")),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setModalState(() => _isListening = true);
+    _listeningPulseController.repeat(reverse: true);
+
+    await _speech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        setModalState(() {
+          _quickTaskController.text = result.recognizedWords;
+          _quickTaskController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _quickTaskController.text.length),
+          );
+        });
+      },
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 3),
+      partialResults: true,
+      cancelOnError: true,
+    );
+  }
+
   Future<void> _openQuickCaptureSheet() async {
     _quickTaskController.clear();
     await _loadSubMissions();
@@ -323,7 +382,7 @@ class _DashboardPageState extends State<DashboardPage>
                                   ),
                                 ),
                               ),
-                            /*IconButton(
+                            IconButton(
                               icon: Icon(
                                 _isListening ? Icons.mic : Icons.mic_none,
                                 color: _isListening
@@ -331,7 +390,7 @@ class _DashboardPageState extends State<DashboardPage>
                                     : const Color(AppColors.textMuted),
                               ),
                               onPressed: () => _toggleListening(setModalState),
-                            ),*/
+                            ),
                           ],
                         ),
                       ),
@@ -401,7 +460,7 @@ class _DashboardPageState extends State<DashboardPage>
                           selectedSubMissionId,
                         );
                         if (_isListening) {
-                          //await _speech.stop();
+                          await _speech.stop();
                           if (!mounted) return;
                           setState(() => _isListening = false);
                           _listeningPulseController.stop();
@@ -420,7 +479,7 @@ class _DashboardPageState extends State<DashboardPage>
       },
     );
     if (_isListening) {
-      //await _speech.stop();
+      await _speech.stop();
       if (mounted) {
         setState(() => _isListening = false);
       }
@@ -430,10 +489,7 @@ class _DashboardPageState extends State<DashboardPage>
     _isQuickCaptureOpen = false;
   }
 
-  Future<void> _saveQuickCaptureTask(
-    String title,
-    int? subMissionId,
-  ) async {
+  Future<void> _saveQuickCaptureTask(String title, int? subMissionId) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt("userId");
     if (userId == null) {
@@ -751,8 +807,8 @@ class _DashboardPageState extends State<DashboardPage>
                                 setModalState(() {
                                   selectedSubMissionId =
                                       value == null || value == -1
-                                          ? null
-                                          : value;
+                                      ? null
+                                      : value;
                                   errorText = null;
                                 });
                               }
@@ -997,13 +1053,6 @@ class _DashboardPageState extends State<DashboardPage>
 
                               // Update locally if needed, or reload
                               setState(() {
-                                // This is slightly misaligned as createTask might not take all these params yet
-                                // Actually createTask only takes title, description, userId.
-                                // We might need to update createTask or add updateTask call.
-                                // For now assuming createTask handles basic creation.
-                                // But wait, the previous code was inserting a full object.
-
-                                // Let's rely on reload for proper ID or simple insert
                                 _tasks.insert(0, resolvedTask);
                               });
                             } catch (e) {
@@ -1066,22 +1115,6 @@ class _DashboardPageState extends State<DashboardPage>
       ],
     );
   }
-
-  // Widget _buildActiveGoals() {
-  //   return SizedBox(
-  //     height: 170,
-  //     child: ListView(
-  //       scrollDirection: Axis.horizontal,
-  //       children: const [
-  //         GoalCard(title: 'Run a 5k Marathon', imgUrl: '', progress: 0.75),
-  //         SizedBox(width: 12),
-  //         GoalCard(title: 'Run a 5k Marathon', imgUrl: '', progress: 0.4),
-  //         SizedBox(width: 12),
-  //         GoalCard(title: 'Run a 5k Marathon', imgUrl: '', progress: 0.6),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   Widget _buildPriorityMatrix(BuildContext context) {
     return Container(

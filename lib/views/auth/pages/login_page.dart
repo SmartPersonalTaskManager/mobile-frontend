@@ -284,36 +284,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                Row(
-                  children: const [
-                    Expanded(
-                      child: Divider(color: Color(AppColors.surfaceBase)),
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      "OR",
-                      style: TextStyle(
-                        color: Color(AppColors.textMuted),
-                        fontSize: 12,
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Divider(color: Color(AppColors.surfaceBase)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildSocialButton(
-                      "Continue with Google",
-                      Icons.g_mobiledata,
-                    ),
-                    //_buildSocialButton("Apple", Icons.apple),
-                  ],
-                ),
               ],
             ),
           ),
