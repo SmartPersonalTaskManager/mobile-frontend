@@ -32,6 +32,7 @@ class _NotificationsPageState extends State<NotificationsPage>
   final MissionService _missionService = MissionService();
   List<NotificationItem> items = [];
   List<TaskItem> inboxTasks = [];
+  List<TaskItem> _dueSoonTasks = [];
   final List<ContextTag> _contexts = [];
   final List<SubMission> _subMissions = [];
 
@@ -83,13 +84,24 @@ class _NotificationsPageState extends State<NotificationsPage>
     final userId = prefs.getInt("userId");
     if (userId == null) {
       inboxTasks = [];
+      _dueSoonTasks = [];
       return;
     }
 
     try {
       final tasks = await _taskService.getTasks(userId);
+      final activeTasks =
+          tasks.where((task) => !task.isArchived && !task.done).toList();
+      _dueSoonTasks = activeTasks
+          .where((task) => _isDueSoon(task.dueDate))
+          .toList()
+        ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
       inboxTasks =
-          tasks.where((task) => task.isInbox && !task.isArchived).toList()
+          activeTasks
+              .where(
+                (task) => task.isInbox && !_isDueSoon(task.dueDate),
+              )
+              .toList()
             ..sort((a, b) => b.id.compareTo(a.id));
     } catch (e) {
       if (!mounted) return;
@@ -175,6 +187,15 @@ class _NotificationsPageState extends State<NotificationsPage>
     ];
     final month = months[value.month - 1];
     return "$month ${value.day.toString().padLeft(2, "0")}";
+  }
+
+  bool _isDueSoon(DateTime? dueDate) {
+    if (dueDate == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final difference = target.difference(today).inDays;
+    return difference >= 0 && difference <= 3;
   }
 
   Future<void> _openQuickTaskAssignmentSheet(TaskItem task) async {
@@ -961,6 +982,100 @@ class _NotificationsPageState extends State<NotificationsPage>
     );
   }
 
+  Widget _buildAllList() {
+    final unreadItems = items.where((item) => !item.read).toList();
+    final hasAny =
+        unreadItems.isNotEmpty || _dueSoonTasks.isNotEmpty || inboxTasks.isNotEmpty;
+    if (!hasAny) {
+      return const Center(
+        child: Text(
+          "No notifications yet.",
+          style: TextStyle(color: Color(AppColors.textMuted)),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        children: [
+          if (unreadItems.isNotEmpty) _buildSectionTitle("Notifications"),
+          ...unreadItems.map(
+            (item) => _buildSwipeNotification(
+              key: ValueKey("notification_${item.id}"),
+              title: item.title,
+              message: item.message,
+              time: item.time,
+              icon: item.read
+                  ? Icons.notifications
+                  : Icons.notifications_active,
+              iconColor: item.read ? const Color(AppColors.textMuted) : green,
+              done: item.read,
+              dismissDirection: DismissDirection.none,
+              onTap: () async {
+                await service.markRead(item.id);
+                await _loadData();
+                if (!mounted) return;
+                if (item.id.startsWith("weekly_insights_")) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
+              },
+            ),
+          ),
+          if (_dueSoonTasks.isNotEmpty) _buildSectionTitle("Due Soon"),
+          ..._dueSoonTasks.map((task) {
+            final missionLine = task.mission == null
+                ? "Inbox"
+                : "Mission: ${task.mission}";
+            return _buildSwipeNotification(
+              key: ValueKey("due_${task.id}"),
+              title: task.title,
+              message: missionLine,
+              time: "Due ${_formatDate(task.dueDate!)}",
+              icon: Icons.event,
+              iconColor: const Color(AppColors.success),
+              dismissDirection: DismissDirection.none,
+            );
+          }),
+          if (inboxTasks.isNotEmpty) _buildSectionTitle("Inbox Tasks"),
+          ...inboxTasks.map((task) {
+            final missionLine = task.mission == null
+                ? "Inbox"
+                : "Mission: ${task.mission}";
+            return _buildSwipeNotification(
+              key: ValueKey("inbox_all_${task.id}"),
+              title: task.title,
+              message: missionLine,
+              time: "Recently",
+              icon: Icons.inbox,
+              iconColor: green,
+              onTap: () => _openQuickTaskAssignmentSheet(task),
+              dismissDirection: DismissDirection.endToStart,
+              onDismissed: (_) async {
+                final removedTask = task;
+                setState(() {
+                  inboxTasks.removeWhere((item) => item.id == task.id);
+                });
+                try {
+                  await _taskService.deleteTask(removedTask.id);
+                } catch (e) {
+                  if (!mounted) return;
+                  setState(() {
+                    inboxTasks.insert(0, removedTask);
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Failed to delete task: $e")),
+                  );
+                }
+              },
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInboxList() {
     if (inboxTasks.isEmpty) {
       return const Center(
@@ -981,10 +1096,14 @@ class _NotificationsPageState extends State<NotificationsPage>
           final missionLine = task.mission == null
               ? "Inbox"
               : "Mission: ${task.mission}";
+          final dueLine =
+              _isDueSoon(task.dueDate) ? "Due ${_formatDate(task.dueDate!)}" : null;
+          final message =
+              dueLine == null ? missionLine : "$missionLine · $dueLine";
           return _buildSwipeNotification(
             key: ValueKey("inbox_${task.id}"),
             title: task.title,
-            message: missionLine,
+            message: message,
             time: "Recently",
             icon: Icons.inbox,
             iconColor: green,
@@ -1028,8 +1147,8 @@ class _NotificationsPageState extends State<NotificationsPage>
             Expanded(
               child: TabBarView(
                 controller: tabController,
-                children: [
-                  _buildNotificationsList(),
+              children: [
+                  _buildAllList(),
                   _buildInboxList(),
                   _buildNotificationsList(),
                 ],

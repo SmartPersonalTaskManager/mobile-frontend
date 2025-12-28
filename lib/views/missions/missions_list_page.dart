@@ -6,6 +6,7 @@ import 'package:sptm/models/mission.dart';
 import 'package:sptm/services/core_value_service.dart';
 import 'package:sptm/services/mission_service.dart';
 import 'package:sptm/views/missions/mission_detail_page.dart';
+import 'package:sptm/views/values/manage_values_page.dart';
 import 'package:sptm/views/widgets/app_bar.dart';
 
 class MissionsListPage extends StatefulWidget {
@@ -19,7 +20,9 @@ class _MissionsListPageState extends State<MissionsListPage> {
   final MissionService _missionService = MissionService();
   final CoreValueService _coreValueService = CoreValueService();
   final List<Mission> _missions = [];
-  CoreValue? _coreValue;
+  final PageController _valuesController = PageController();
+  List<CoreValue> _coreValues = [];
+  int _valueIndex = 0;
   bool _isLoading = true;
   bool _isLoadingValue = true;
   bool _isSavingValue = false;
@@ -29,6 +32,12 @@ class _MissionsListPageState extends State<MissionsListPage> {
     super.initState();
     _loadMissions();
     _loadCoreValues();
+  }
+
+  @override
+  void dispose() {
+    _valuesController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMissions() async {
@@ -68,15 +77,23 @@ class _MissionsListPageState extends State<MissionsListPage> {
       final values = await _coreValueService.fetchUserCoreValues(userId);
       if (!mounted) return;
       setState(() {
-        _coreValue = values.isNotEmpty ? values.first : null;
+        _coreValues = values;
+        if (_coreValues.isEmpty) {
+          _valueIndex = 0;
+        } else if (_valueIndex >= _coreValues.length) {
+          _valueIndex = 0;
+        }
         _isLoadingValue = false;
       });
+      if (_valuesController.hasClients && _coreValues.isNotEmpty) {
+        _valuesController.jumpToPage(_valueIndex);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoadingValue = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load core values: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load core values: $e")));
     }
   }
 
@@ -150,9 +167,9 @@ class _MissionsListPageState extends State<MissionsListPage> {
     }
   }
 
-  Future<void> _showEditValueDialog() async {
+  Future<void> _showAddValueDialog() async {
     if (_isSavingValue) return;
-    final controller = TextEditingController(text: _coreValue?.text ?? '');
+    final controller = TextEditingController();
 
     final result = await showDialog<String>(
       context: context,
@@ -160,7 +177,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
         return AlertDialog(
           backgroundColor: const Color(AppColors.surface),
           title: const Text(
-            'Edit Core Value',
+            'Add Core Value',
             style: TextStyle(color: Color(AppColors.textMain)),
           ),
           content: TextField(
@@ -201,36 +218,58 @@ class _MissionsListPageState extends State<MissionsListPage> {
     final userId = prefs.getInt("userId");
     if (userId == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User not found.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("User not found.")));
       return;
     }
 
     setState(() => _isSavingValue = true);
     try {
-      final updated = _coreValue == null
-          ? await _coreValueService.createCoreValue(userId: userId, text: text)
-          : await _coreValueService.updateCoreValue(
-              id: _coreValue!.id,
-              text: text,
-            );
+      final created = await _coreValueService.createCoreValue(
+        userId: userId,
+        text: text,
+      );
       if (!mounted) return;
       setState(() {
-        _coreValue = updated;
+        _coreValues = [created, ..._coreValues];
+        _valueIndex = 0;
         _isSavingValue = false;
       });
+      if (_valuesController.hasClients) {
+        _valuesController.jumpToPage(_valueIndex);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSavingValue = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to save core value: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to save core value: $e")));
     }
   }
 
+  Future<void> _openManageValuesPage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId");
+    if (userId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("User not found.")));
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManageValuesPage(values: _coreValues, userId: userId),
+      ),
+    );
+
+    if (!mounted) return;
+    _loadCoreValues();
+  }
+
   Widget _buildValueHeader() {
-    final valueText = _coreValue?.text;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
@@ -240,46 +279,108 @@ class _MissionsListPageState extends State<MissionsListPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'My Values:',
-                style: TextStyle(
-                  color: Color(AppColors.textMain),
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Values:',
+                  style: TextStyle(
+                    color: Color(AppColors.textMain),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              if (_isLoadingValue)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Color(AppColors.primary),
+                if (_isLoadingValue)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(AppColors.primary),
+                      ),
+                    ),
+                  )
+                else if (_coreValues.isEmpty)
+                  const Text(
+                    'Enter your core values',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Color(AppColors.textMain),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 46,
+                    child: PageView.builder(
+                      controller: _valuesController,
+                      itemCount: _coreValues.length,
+                      onPageChanged: (index) {
+                        setState(() => _valueIndex = index);
+                      },
+                      itemBuilder: (context, index) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '"${_coreValues[index].text}"',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Color(AppColors.textMain),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                )
-              else
-                Text(
-                  valueText?.isNotEmpty == true
-                      ? '"$valueText"'
-                      : 'Enter your core values',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    color: Color(AppColors.textMain),
-                    fontStyle: FontStyle.italic,
+                if (!_isLoadingValue && _coreValues.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(_coreValues.length, (index) {
+                        final isActive = index == _valueIndex;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: isActive ? 10 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? const Color(AppColors.primary)
+                                : const Color(AppColors.textMuted),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        );
+                      }),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.edit, color: Color(AppColors.textMain)),
-            onPressed: _isSavingValue ? null : _showEditValueDialog,
-            tooltip: "Edit core value",
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.edit,
+                  color: Color(AppColors.textMain),
+                  size: 20,
+                ),
+                onPressed: _isSavingValue ? null : _openManageValuesPage,
+                tooltip: "Manage values",
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, color: Color(AppColors.textMain)),
+                onPressed: _isSavingValue ? null : _showAddValueDialog,
+                tooltip: "Add core value",
+              ),
+            ],
           ),
         ],
       ),
