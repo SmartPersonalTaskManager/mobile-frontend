@@ -88,15 +88,14 @@ class _NotificationsPageState extends State<NotificationsPage>
 
     try {
       final tasks = await _taskService.getTasks(userId);
-      inboxTasks = tasks
-          .where((task) => task.isInbox && !task.isArchived)
-          .toList()
-        ..sort((a, b) => b.id.compareTo(a.id));
+      inboxTasks =
+          tasks.where((task) => task.isInbox && !task.isArchived).toList()
+            ..sort((a, b) => b.id.compareTo(a.id));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load inbox tasks: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load inbox tasks: $e")));
     }
   }
 
@@ -397,8 +396,8 @@ class _NotificationsPageState extends State<NotificationsPage>
                                 setModalState(() {
                                   selectedSubMissionId =
                                       value == null || value == -1
-                                          ? null
-                                          : value;
+                                      ? null
+                                      : value;
                                   errorText = null;
                                 });
                               }
@@ -952,7 +951,7 @@ class _NotificationsPageState extends State<NotificationsPage>
               await _loadData();
               if (!mounted) return;
               if (item.id.startsWith("weekly_insights_")) {
-                mainNavIndex.value = 3;
+                //mainNavIndex.value = 3;
                 Navigator.of(context).popUntil((route) => route.isFirst);
               }
             },
@@ -979,8 +978,9 @@ class _NotificationsPageState extends State<NotificationsPage>
         itemCount: inboxTasks.length,
         itemBuilder: (context, index) {
           final task = inboxTasks[index];
-          final missionLine =
-              task.mission == null ? "Inbox" : "Mission: ${task.mission}";
+          final missionLine = task.mission == null
+              ? "Inbox"
+              : "Mission: ${task.mission}";
           return _buildSwipeNotification(
             key: ValueKey("inbox_${task.id}"),
             title: task.title,

@@ -291,7 +291,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     SizedBox(width: 10),
                     Text(
-                      "OR CONTINUE WITH",
+                      "OR",
                       style: TextStyle(
                         color: Color(AppColors.textMuted),
                         fontSize: 12,
@@ -307,8 +307,11 @@ class _LoginPageState extends State<LoginPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildSocialButton("Google", Icons.g_mobiledata),
-                    _buildSocialButton("Apple", Icons.apple),
+                    _buildSocialButton(
+                      "Continue with Google",
+                      Icons.g_mobiledata,
+                    ),
+                    //_buildSocialButton("Apple", Icons.apple),
                   ],
                 ),
               ],
