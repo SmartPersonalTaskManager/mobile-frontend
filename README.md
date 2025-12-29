@@ -4,21 +4,19 @@ SPTM is a Flutter-based mobile frontend for the OOAD project. It provides the us
 
 ## Table of Contents
 
-- Project Overview
-- Features at a Glance
-- Tech Stack
-- Requirements
-- Quick Start
-- Environment Configuration
-- Project Structure
-- Common Workflows
-- Running and Debugging
-- Testing and Quality
-- Build and Release
-- Assets and Localization
-- Troubleshooting
-- Contributing
-- License
+- [Project Overview](#project-overview)
+- [App Features and Usage](#app-features-and-usage)
+- [Tech Stack](#tech-stack)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Environment Configuration](#environment-configuration)
+- [Project Structure](#project-structure)
+- [Common Workflows](#common-workflows)
+- [Running and Debugging](#running-and-debugging)
+- [Testing and Quality](#testing-and-quality)
+- [Build and Release](#build-and-release)
+- [Assets and Localization](#assets-and-localization)
+- [Troubleshooting](#troubleshooting)
 
 ## Project Overview
 
@@ -31,12 +29,70 @@ Primary goals:
 - Integrate with backend APIs reliably
 - Support multiple platforms with a shared codebase
 
-## Features at a Glance
+## App Features and Usage
 
-- Flutter UI with platform-specific builds
-- Asset management for images and other resources
-- API integration layer (see `API_DOCUMENTAION.md`)
-- Configurable build targets for Android/iOS and other platforms
+This section describes what the app does from a user perspective and how core flows work.
+
+### Authentication and Account Access
+
+- Users can register a new account and log in with email and password.
+- A "forgot password" flow allows password resets from the login screen.
+- Sessions are required to access personal tasks, missions, and insights.
+
+### Dashboard and Task Overview
+
+- The dashboard shows your active tasks grouped by urgency and importance.
+- Tasks appear with title, mission/sub-mission labels, context tags, and due dates.
+- A quick-add flow lets you create tasks directly from the dashboard.
+- Tasks can be toggled complete/incomplete from the list with immediate visual updates.
+
+### Task Creation and Editing
+
+- Create tasks with title, description, due date, urgency, importance, and context.
+- Assign tasks to a mission or sub-mission when applicable.
+- Edit task details at any time, including due dates and context.
+- Delete tasks you no longer need.
+
+### Task Details and Checklist
+
+- Each task has a dedicated detail view for rich editing.
+- Add descriptive notes to capture requirements or reminders.
+- Create a checklist to break the task into smaller steps.
+- Archive a task from the detail view when it is no longer active.
+
+### Missions and Sub-Missions
+
+- Missions represent larger goals; sub-missions break them into smaller milestones.
+- A missions list shows all missions and sub-mission counts.
+- Each mission detail page shows linked tasks for each sub-mission.
+- Tasks can be created, updated, and completed within a sub-mission context.
+
+### Calendar and Due Dates
+
+- A calendar view lets users browse tasks by day.
+- Selecting a date shows all tasks due on that day.
+- Quick toggles let users mark tasks done without leaving the calendar.
+
+### Inbox, Notifications, and Follow-Ups
+
+- Notifications include due-soon reminders and weekly insights.
+- Inbox tasks can be assigned details like due date, urgency, and context.
+- Users can act on a notification to open and update the related task.
+
+### Insights and Progress
+
+- Weekly insights summarize completed tasks and mission progress.
+- Progress views help spot momentum and backlog areas.
+
+### Archive Management
+
+- Archived tasks are hidden from daily views.
+- The archive screen allows restoring or permanently deleting tasks.
+
+### Settings and Profile
+
+- Settings provide access to profile information and app actions.
+- Use settings to review account data and sign out when needed.
 
 ## Tech Stack
 
@@ -94,7 +150,6 @@ Key folders:
 - `android/`: Android native project
 - `ios/`: iOS native project
 - `web/`, `macos/`, `windows/`, `linux/`: Optional platform targets
-- `API_DOCUMENTAION.md`: API reference for backend integration
 
 ## Common Workflows
 
@@ -111,11 +166,6 @@ Run on a specific device:
 ```bash
 flutter run -d <device_id>
 ```
-
-### Hot Reload and Hot Restart
-
-- Hot reload: `r` in the running terminal
-- Hot restart: `R` in the running terminal
 
 ## Running and Debugging
 
@@ -161,14 +211,3 @@ Use Xcode to archive and distribute when targeting the App Store.
 - Run `flutter doctor` to validate setup.
 - If iOS pods fail, run `pod install` in `ios/` (or `pod repo update` if needed).
 - If builds fail after dependency changes, try `flutter clean` followed by `flutter pub get`.
-
-## Contributing
-
-1. Create a feature branch.
-2. Keep changes scoped and well-tested.
-3. Run formatting and tests before opening a PR.
-4. Document any new environment variables or build steps in this README.
-
-## License
-
-Add license information here if applicable.
